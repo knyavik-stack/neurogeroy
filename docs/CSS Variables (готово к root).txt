@@ -1,0 +1,14 @@
+:root {
+  --bg-primary: #0B1220;
+  --bg-secondary: #111827;
+  --bg-elevated: #1F2937;
+  --bg-card: #1E293B;
+  --accent-turquoise: #06B6D4;
+  --accent-orange: #F97316;
+  --accent-yellow: #FACC15;
+  --accent-purple: #8B5CF6;
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --radius-card: 16px;
+  --radius-button: 14px;
+}

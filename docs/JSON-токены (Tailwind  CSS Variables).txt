@@ -1,0 +1,35 @@
+{
+  "colors": {
+    "bg": {
+      "primary": "#0B1220",
+      "secondary": "#111827",
+      "elevated": "#1F2937",
+      "card": "#1E293B"
+    },
+    "accent": {
+      "blue": "#1E3A8A",
+      "turquoise": "#06B6D4",
+      "orange": "#F97316",
+      "yellow": "#FACC15",
+      "purple": "#8B5CF6"
+    },
+    "text": {
+      "primary": "#F8FAFC",
+      "secondary": "#94A3B8",
+      "muted": "#64748B",
+      "accent": "#06B6D4"
+    },
+    "success": "#10B981",
+    "warning": "#F59E0B",
+    "error": "#EF4444"
+  },
+  "borderRadius": {
+    "card": "16px",
+    "button": "14px",
+    "small": "10px",
+    "full": "9999px"
+  },
+  "fontFamily": {
+    "sans": ["Manrope", "Inter", "Nunito", "system-ui", "sans-serif"]
+  }
+}

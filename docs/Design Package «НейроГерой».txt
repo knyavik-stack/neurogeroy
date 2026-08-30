@@ -1,0 +1,19 @@
+design-system/
+├── README.md                    ← главная инструкция
+├── master-prompt.md             ← расширенный промпт + правила
+├── tokens/
+│   ├── tokens.json              ← все токены
+│   ├── tokens.css               ← CSS-переменные
+│   └── tailwind.config.js       ← готовый конфиг под Tailwind
+├── components/
+│   ├── components.md            ← описание всех компонентов
+│   └── (позже сюда код кнопок, карточек и т.д.)
+├── screens/
+│   ├── home.md
+│   ├── character.md
+│   ├── reaction-game.md
+│   ├── memory-game.md
+│   ├── parent-dashboard.md
+│   ├── shop.md
+│   └── achievements.md
+└── checklist.md                 ← чеклист вайба
