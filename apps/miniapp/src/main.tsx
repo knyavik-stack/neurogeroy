@@ -3,9 +3,17 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 
 type Phase = "home" | "intro" | "waiting" | "lightning" | "result";
+type TelegramWebApp = {
+  ready?: () => void; expand?: () => void; platform?: string;
+  initData?: string; initDataUnsafe?: { user?: { first_name?: string } };
+  HapticFeedback?: { impactOccurred?: (style: "light" | "medium" | "heavy") => void; notificationOccurred?: (type: "success" | "error") => void };
+};
+declare global { interface Window { Telegram?: { WebApp?: TelegramWebApp } } }
+
 const MIN_WAIT = 1200;
 const MAX_WAIT = 3500;
 const STORAGE_KEY = "neurogeroy.lightning.bestReactionMs";
+const tg = window.Telegram?.WebApp;
 
 function App() {
   const [phase, setPhase] = React.useState<Phase>("home");
@@ -16,17 +24,22 @@ function App() {
   });
   const signalAt = React.useRef<number | null>(null);
   const timeoutRef = React.useRef<number | null>(null);
+  const name = tg?.initDataUnsafe?.user?.first_name ?? "Герой";
 
-  React.useEffect(() => () => {
-    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+  React.useEffect(() => {
+    tg?.ready?.();
+    tg?.expand?.();
+    return () => { if (timeoutRef.current) window.clearTimeout(timeoutRef.current); };
   }, []);
 
   function startRound() {
+    tg?.HapticFeedback?.impactOccurred?.("light");
     setReaction(null);
     setPhase("waiting");
     const delay = MIN_WAIT + Math.random() * (MAX_WAIT - MIN_WAIT);
     timeoutRef.current = window.setTimeout(() => {
       signalAt.current = performance.now();
+      tg?.HapticFeedback?.impactOccurred?.("medium");
       setPhase("lightning");
     }, delay);
   }
@@ -35,6 +48,7 @@ function App() {
     if (phase === "waiting") {
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
       signalAt.current = null;
+      tg?.HapticFeedback?.notificationOccurred?.("error");
       setPhase("intro");
       return;
     }
@@ -46,56 +60,32 @@ function App() {
       setBest(currentBest);
       localStorage.setItem(STORAGE_KEY, String(currentBest));
     }
+    tg?.HapticFeedback?.notificationOccurred?.("success");
     setPhase("result");
   }
 
-  if (phase === "home") {
-    return <main><section className="card">
-      <div className="eyebrow">NEUROGEROY · ФАЗА 0</div>
-      <h1>Привет, Герой!</h1>
-      <p>Первая миссия проверит скорость твоей реакции.</p>
-      {best !== null && <div className="best">Лучший результат: {best} мс</div>}
-      <button onClick={() => setPhase("intro")}>Открыть «Молнию»</button>
-    </section></main>;
-  }
-
-  if (phase === "intro") {
-    return <main><section className="card">
-      <div className="eyebrow">МИССИЯ · МОЛНИЯ</div>
-      <h1>Нажми только после ⚡</h1>
-      <p>Не торопись: ложный старт не засчитывается. Когда появится молния — нажми как можно быстрее.</p>
-      <button onClick={startRound}>Я готов</button>
-      <button className="secondary" onClick={() => setPhase("home")}>Назад</button>
-    </section></main>;
-  }
-
-  if (phase === "waiting") {
-    return <main className="game waiting" onPointerDown={react}>
-      <section className="game-card">
-        <div className="eyebrow">ЖДИ СИГНАЛ</div>
-        <h1>...</h1>
-        <p>Не нажимай раньше времени.</p>
-      </section>
-    </main>;
-  }
-
-  if (phase === "lightning") {
-    return <main className="game lightning" onPointerDown={react}>
-      <section className="game-card">
-        <div className="bolt">⚡</div>
-        <h1>ЖМИ!</h1>
-      </section>
-    </main>;
-  }
-
-  return <main><section className="card">
-    <div className="eyebrow">РЕЗУЛЬТАТ</div>
-    <h1>{reaction} мс</h1>
-    <p>{reaction && reaction < 300 ? "Молниеносно!" : reaction && reaction < 500 ? "Отличная реакция!" : "Хорошая попытка — попробуй ещё раз!"}</p>
-    {best !== null && <div className="best">Твой лучший результат: {best} мс</div>}
-    <button onClick={startRound}>Ещё раз</button>
-    <button className="secondary" onClick={() => setPhase("home")}>К миссиям</button>
+  if (phase === "home") return <main><section className="card">
+    <div className="eyebrow">NEUROGEROY · ФАЗА 0</div>
+    <h1>Привет, {name}!</h1>
+    <p>Первая миссия проверит скорость твоей реакции.</p>
+    {best !== null && <div className="best">Лучший результат: {best} мс</div>}
+    <button onClick={() => setPhase("intro")}>Открыть «Молнию»</button>
+    {!tg && <p className="hint">Режим браузера для разработки. В Telegram будут доступны имя и haptic feedback.</p>}
   </section></main>;
+
+  if (phase === "intro") return <main><section className="card">
+    <div className="eyebrow">МИССИЯ · МОЛНИЯ</div>
+    <h1>Нажми только после ⚡</h1>
+    <p>Не торопись: ложный старт не засчитывается. Когда появится молния — нажми как можно быстрее.</p>
+    <button onClick={startRound}>Я готов</button>
+    <button className="secondary" onClick={() => setPhase("home")}>Назад</button>
+  </section></main>;
+
+  if (phase === "waiting") return <main className="game waiting" onPointerDown={react}><section className="game-card"><div className="eyebrow">ЖДИ СИГНАЛ</div><h1>...</h1><p>Не нажимай раньше времени.</p></section></main>;
+
+  if (phase === "lightning") return <main className="game lightning" onPointerDown={react}><section className="game-card"><div className="bolt">⚡</div><h1>ЖМИ!</h1></section></main>;
+
+  return <main><section className="card"><div className="eyebrow">РЕЗУЛЬТАТ</div><h1>{reaction} мс</h1><p>{reaction && reaction < 300 ? "Молниеносно!" : reaction && reaction < 500 ? "Отличная реакция!" : "Хорошая попытка — попробуй ещё раз!"}</p>{best !== null && <div className="best">Твой лучший результат: {best} мс</div>}<button onClick={startRound}>Ещё раз</button><button className="secondary" onClick={() => setPhase("home")}>К миссиям</button></section></main>;
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
