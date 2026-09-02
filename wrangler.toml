@@ -1,6 +1,6 @@
 name = "neurogeroy"
 main = "worker.js"
-compatibility_date = "2026-09-01"
+compatibility_date = "2026-09-02"
 
 [observability]
 enabled = true
