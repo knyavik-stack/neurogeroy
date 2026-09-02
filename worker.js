@@ -71,7 +71,13 @@ export default {
   scan();
 })();
 </script>`;
-      return new Response(html.replace("</body>", injected + "\n</body>"), response);
+      const headers = new Headers(response.headers);
+      headers.set("cache-control", "no-store");
+      return new Response(html.replace("</body>", injected + "\n</body>"), {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
     }
     return response;
   },
