@@ -1,6 +1,8 @@
 import app from "./progression_entry.js";
 import { renderFocusRibbonHtml } from "./games/focus_ribbon.js";
 
+const ENABLED_FALLBACK = new Set(["focus_ribbon"]);
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -14,10 +16,10 @@ export default {
 
 async function gameEnabled(env,code){
   const key=env.SUPABASE_SECRET_KEY;
-  if(!env.SUPABASE_URL||!key)return false;
+  if(!env.SUPABASE_URL||!key)return ENABLED_FALLBACK.has(code);
   try{
     const r=await fetch(env.SUPABASE_URL.replace(/\/$/,"")+`/rest/v1/games?select=code&code=eq.${encodeURIComponent(code)}&enabled=eq.true&limit=1`,{headers:{apikey:key,Authorization:"Bearer "+key}});
-    if(!r.ok)return false;
+    if(!r.ok)return ENABLED_FALLBACK.has(code);
     const rows=await r.json();return Array.isArray(rows)&&rows.length===1;
-  }catch{return false}
+  }catch{return ENABLED_FALLBACK.has(code)}
 }
