@@ -6,7 +6,12 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    if (request.method === "GET" && url.pathname === "/games/memory-grid") return new Response(MEMORY_GRID_HTML, { headers: htmlHeaders() });
+    if (request.method === "GET" && url.pathname === "/api/games") return listGames(env);
+
+    if (request.method === "GET" && url.pathname === "/games/memory-grid") {
+      if (!(await gameEnabled(env, "memory_grid"))) return json({ok:false,error:"Game disabled"},404);
+      return new Response(MEMORY_GRID_HTML, { headers: htmlHeaders() });
+    }
 
     if (request.method === "POST" && url.pathname === "/api/game-sessions") {
       try {
@@ -38,6 +43,27 @@ export default {
     return response;
   }
 };
+
+async function listGames(env){
+  const key=env.SUPABASE_SECRET_KEY;
+  if(!env.SUPABASE_URL||!key)return json({ok:false,error:"Server storage configuration error"},500);
+  try{
+    const r=await fetch(env.SUPABASE_URL.replace(/\/$/,"")+"/rest/v1/games?select=code,title,skill_domain,route,sort_order,config&enabled=eq.true&route=not.is.null&order=sort_order.asc,code.asc",{headers:{apikey:key,Authorization:"Bearer "+key}});
+    if(!r.ok)return json({ok:false,error:"Could not load game catalog"},502);
+    const games=await r.json();
+    return json({ok:true,games:Array.isArray(games)?games:[]});
+  }catch{return json({ok:false,error:"Could not load game catalog"},502)}
+}
+
+async function gameEnabled(env,code){
+  const key=env.SUPABASE_SECRET_KEY;
+  if(!env.SUPABASE_URL||!key)return false;
+  try{
+    const r=await fetch(env.SUPABASE_URL.replace(/\/$/,"")+`/rest/v1/games?select=code&code=eq.${encodeURIComponent(code)}&enabled=eq.true&limit=1`,{headers:{apikey:key,Authorization:"Bearer "+key}});
+    if(!r.ok)return false;
+    const rows=await r.json();return Array.isArray(rows)&&rows.length===1;
+  }catch{return false}
+}
 
 const MEMORY_GRID_HTML=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="https://telegram.org/js/telegram-web-app.js"></script><title>NeuroGeroy · Память-сетка</title><style>:root{--bg:#101322;--card:#1b2035;--text:#fff;--muted:#b9c0dc}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,sans-serif}#app{min-height:100vh;display:grid;place-items:center;padding:20px}.card{width:min(100%,520px);padding:28px;border-radius:30px;background:linear-gradient(145deg,#1d233b,#111524);text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.35)}h1{font-size:clamp(32px,9vw,48px)}p{color:var(--muted);line-height:1.5}.eyebrow{font-size:12px;letter-spacing:.14em;opacity:.65;font-weight:700}button{width:100%;margin-top:14px;border:0;border-radius:18px;padding:17px;font-size:17px;font-weight:800}.secondary{background:transparent;border:1px solid rgba(255,255,255,.2);color:#fff}.memory-grid{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:10px;margin:22px auto}.cell{aspect-ratio:1;border-radius:16px;background:#27304b;border:0;margin:0}.cell.active{background:#fff;box-shadow:0 0 25px rgba(255,255,255,.35)}.cell:disabled{opacity:1}.best{padding:15px;border-radius:16px;background:rgba(255,255,255,.07)}</style></head><body><div id="app"></div><script>
 const app=document.getElementById("app"),tg=window.Telegram?.WebApp;try{tg?.ready();tg?.expand()}catch(_){} let d=1,phase="intro",pattern=[],selected=[],errors=0,startedAt=0,clickTimes=[],saved=false;
