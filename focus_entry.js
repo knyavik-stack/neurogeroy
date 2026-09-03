@@ -1,4 +1,4 @@
-import app from "./progress_entry.js";
+import app from "./progression_entry.js";
 import { renderFocusRibbonHtml } from "./games/focus_ribbon.js";
 
 export default {
