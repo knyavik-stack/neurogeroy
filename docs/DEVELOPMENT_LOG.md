@@ -1,44 +1,50 @@
 # Development Log
 
-## 2026-09-03 — Extensible game foundation
+## 2026-09-03 — MVP game and progress implementation
 
 ### Completed
-- Added normalized `record_game_session` persistence contract.
-- Added server-side Telegram initData verification for game results.
 - Preserved the existing Lightning UI in `worker.js`.
-- Added the `public.games` registry with enabled/disabled state, route, skill domain and ordering.
-- Added registry-backed `GET /api/games`.
-- Added route-level enabled checks for isolated games.
-- Added Memory Grid telemetry: duration, errors, grid size, pattern length and per-input timing.
-- Added generic `game_sessions.metadata` for game-specific metrics without changing the core session schema for every new game.
-- Prepared and integrated the isolated Switcher module at `/games/switcher`.
-- Switcher records overall accuracy, total errors, adaptation latency and errors immediately after rule changes.
-- Enabled Switcher in the game registry only after its route was integrated.
-- Verified the generic RPC accepts Switcher-specific metadata and cleaned the synthetic test data.
+- Kept the server-side Telegram initData verification and normalized `record_game_session` persistence contract.
+- Kept the `public.games` registry with enabled/disabled state, route, skill domain and ordering.
+- Memory Grid is enabled at `/games/memory-grid` with duration, errors, grid size, pattern length and per-input timing telemetry.
+- Switcher is enabled at `/games/switcher` with adaptation latency, post-change errors and overall accuracy telemetry.
+- Focus Ribbon is now implemented as an isolated module at `/games/focus-ribbon`.
+- Focus Ribbon uses a long simple stimulus series, optional distractors, gradually faster tempo and records first/middle/last-third accuracy plus accuracy drop, matching the GDD metric contract.
+- Added authenticated `Мой прогресс` at `/progress` and `/api/progress` using server-side Supabase access.
+- Progress shows character level, experience, coins and three skill cards with measurable statistics and a today-vs-seven-days-ago comparison when data exists.
+- Added layered Worker entrypoints so new screens/routes do not require overwriting the legacy Lightning Worker.
+- Created a dated backup branch before the progress structural change.
+- Triggered a fresh `main` deployment commit after the production symptom showed that the repository implementation and the live game set had diverged.
 
 ### Current architecture
 ```text
 Telegram Mini App
-  -> Worker entry
-     -> registry / isolated game route
-     -> Telegram verification
-     -> normalized game API
-        -> Supabase RPC
-           -> players
-           -> game_sessions + metadata
-           -> player_game_stats
-           -> analytics view
+  -> focus_entry.js
+     -> Focus Ribbon route
+     -> progress_entry.js
+        -> My Progress API/page
+        -> worker_entry.js
+           -> registry / isolated Memory Grid / Switcher
+           -> Lightning legacy Worker
+           -> Telegram verification
+           -> normalized game API
+              -> Supabase RPC
+                 -> players
+                 -> game_sessions + metadata
+                 -> player_game_stats
+                 -> analytics view
 ```
 
-### Current production game set
+### Current MVP game set
 1. Lightning — reaction speed
 2. Memory Grid — working memory
 3. Switcher — cognitive flexibility
+4. Focus Ribbon — sustained attention
 
-The remaining MVP games stay out of navigation until their isolated routes are implemented and verified.
+Pattern and Dual Stream remain disabled until their isolated implementations are verified.
 
 ### Deployment checkpoint
-The repository `main` branch is the Cloudflare deployment source. A fresh documentation commit is used here as a deployment trigger so the currently integrated game routes are rebuilt from the present `worker_entry.js` rather than an older Worker version. Production availability still requires the corresponding Cloudflare build to complete successfully.
+`wrangler.toml` now points to `focus_entry.js`, which composes the existing Worker entry and the new progress/game routes. The compatibility date remains `2026-09-01`. Cloudflare Workers Builds documentation confirms that a connected Worker deploys from pushes to the configured production branch; the repository currently uses `main`. Production build success itself is not exposed through the available GitHub status endpoint, so it is not claimed as verified here.
 
-### Next implementation task
-Implement the Must-level `Мой прогресс` screen using the collected per-game statistics, with a short self-comparison view. The PRD requires visible growth across 2–3 skills and a simple `today vs week ago` comparison; the product concept explicitly prioritizes measurable progress rather than unsupported claims.
+### Next implementation block
+Complete the remaining Must-level progression layer: basic achievements and daily quests, then parent binding/reporting. Do not add Should/Could features before the remaining Must items are stable.
