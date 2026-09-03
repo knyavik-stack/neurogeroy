@@ -1,7 +1,7 @@
 # Переключатель — implementation note
 
 ## Source requirements
-The GDD defines Switcher as a cognitive-flexibility game: the player follows a simple rule, then the rule changes without warning. Required metrics are adaptation speed after a rule change, errors immediately after a change, and overall accuracy. fileciteturn111file1
+The GDD defines Switcher as a cognitive-flexibility game: the player follows a simple rule, then the rule changes without warning. Required metrics are adaptation speed after a rule change, errors immediately after a change, and overall accuracy.
 
 ## Current implementation
 `games/switcher.js` is an isolated client module prepared for production integration.
@@ -21,4 +21,4 @@ Generic `record_game_session` now accepts `metadata` in addition to normalized m
 ## Integration gate
 The module is not added to `public.games.route` until it is wired into `worker_entry.js`. This prevents the catalog from exposing a route that is not yet served.
 
-The GDD target is a 40–90 second session, short rules, gradual difficulty, and a concise result screen. fileciteturn111file2
+The GDD target is a 40–90 second session, short rules, gradual difficulty, and a concise result screen.
