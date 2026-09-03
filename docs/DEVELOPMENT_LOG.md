@@ -37,5 +37,8 @@ Telegram Mini App
 
 The remaining MVP games stay out of navigation until their isolated routes are implemented and verified.
 
+### Deployment checkpoint
+The repository `main` branch is the Cloudflare deployment source. A fresh documentation commit is used here as a deployment trigger so the currently integrated game routes are rebuilt from the present `worker_entry.js` rather than an older Worker version. Production availability still requires the corresponding Cloudflare build to complete successfully.
+
 ### Next implementation task
 Implement the Must-level `Мой прогресс` screen using the collected per-game statistics, with a short self-comparison view. The PRD requires visible growth across 2–3 skills and a simple `today vs week ago` comparison; the product concept explicitly prioritizes measurable progress rather than unsupported claims.
