@@ -1,5 +1,5 @@
 name = "neurogeroy"
-main = "progress_entry.js"
+main = "focus_entry.js"
 compatibility_date = "2026-09-01"
 
 [observability]
