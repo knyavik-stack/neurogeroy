@@ -1,4 +1,5 @@
 import legacy from "./worker.js";
+import { renderSwitcherHtml } from "./games/switcher.js";
 
 const MAX_AUTH_AGE_SECONDS = 3600;
 
@@ -11,6 +12,11 @@ export default {
     if (request.method === "GET" && url.pathname === "/games/memory-grid") {
       if (!(await gameEnabled(env, "memory_grid"))) return json({ok:false,error:"Game disabled"},404);
       return new Response(MEMORY_GRID_HTML, { headers: htmlHeaders() });
+    }
+
+    if (request.method === "GET" && url.pathname === "/games/switcher") {
+      if (!(await gameEnabled(env, "switcher"))) return json({ok:false,error:"Game disabled"},404);
+      return new Response(renderSwitcherHtml(), { headers: htmlHeaders() });
     }
 
     if (request.method === "POST" && url.pathname === "/api/game-sessions") {
@@ -38,7 +44,7 @@ export default {
     const response=await legacy.fetch(request,env,ctx);
     if(request.method==="GET"&&url.pathname==="/"&&response.ok){
       const html=await response.text();
-      const injected='<script>(()=>{const addMemoryLink=()=>{const start=document.getElementById("start");if(!start||document.getElementById("memory-grid-link"))return;const b=document.createElement("button");b.id="memory-grid-link";b.className="secondary";b.textContent="🧠 Память-сетка";b.onclick=()=>location.href="/games/memory-grid";start.insertAdjacentElement("afterend",b)};let saved=false,falseStarts=0;const original=window.falseStart;if(typeof original==="function")window.falseStart=function(...a){falseStarts++;return original.apply(this,a)};const save=async ms=>{if(saved||!Number.isInteger(ms)||ms<1||ms>60000)return;saved=true;const initData=window.Telegram?.WebApp?.initData;if(!initData)return;try{await fetch("/api/game-sessions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({initData,game_code:"lightning",score:Math.max(0,1000-ms),difficulty:1,reaction_ms:ms,false_starts:falseStarts})})}catch(_){saved=false}};const scan=()=>{const h=document.querySelector("h1");const m=h?.textContent.match(/^(\\d+)\\s*мс$/);if(m)save(Number(m[1]))};new MutationObserver(()=>{scan();addMemoryLink()}).observe(document.documentElement,{childList:true,subtree:true});scan();addMemoryLink()})();</script>';
+      const injected='<script>(()=>{const renderCatalog=async()=>{if(document.getElementById("game-catalog"))return;const start=document.getElementById("start");if(!start)return;try{const r=await fetch("/api/games",{cache:"no-store"}),j=await r.json();if(!r.ok||!Array.isArray(j.games))return;const wrap=document.createElement("div");wrap.id="game-catalog";j.games.filter(g=>g.route&&g.route!=="/").forEach(g=>{const b=document.createElement("button");b.className="secondary";b.textContent=(g.code==="memory_grid"?"🧠 ":g.code==="switcher"?"🔄 ":"")+g.title;b.onclick=()=>location.href=g.route;wrap.appendChild(b)});start.insertAdjacentElement("afterend",wrap)}catch(_){}};let saved=false,falseStarts=0;const original=window.falseStart;if(typeof original==="function")window.falseStart=function(...a){falseStarts++;return original.apply(this,a)};const save=async ms=>{if(saved||!Number.isInteger(ms)||ms<1||ms>60000)return;saved=true;const initData=window.Telegram?.WebApp?.initData;if(!initData)return;try{await fetch("/api/game-sessions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({initData,game_code:"lightning",score:Math.max(0,1000-ms),difficulty:1,reaction_ms:ms,false_starts:falseStarts})})}catch(_){saved=false}};const scan=()=>{const h=document.querySelector("h1");const m=h?.textContent.match(/^(\\d+)\\s*мс$/);if(m)save(Number(m[1]))};new MutationObserver(()=>{scan();renderCatalog()}).observe(document.documentElement,{childList:true,subtree:true});scan();renderCatalog()})();</script>';
       const headers=new Headers(response.headers);headers.set("cache-control","no-store");return new Response(html.replace("</body>",injected+"\n</body>"),{status:response.status,headers});
     }
     return response;
@@ -78,4 +84,4 @@ async function save(score,accuracy,complete){if(saved)return;saved=true;const in
 render();</script></body></html>`;
 function htmlHeaders(){return {"content-type":"text/html; charset=UTF-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin"}}
 async function validateTelegramInitData(initData,botToken){if(!initData||!botToken)return{ok:false,error:"Missing Telegram authorization"};const p=new URLSearchParams(initData),hash=p.get("hash"),date=Number(p.get("auth_date")),raw=p.get("user");if(!hash||!date||!raw)return{ok:false,error:"Invalid Telegram initData"};const now=Math.floor(Date.now()/1000);if(date>now+60||now-date>MAX_AUTH_AGE_SECONDS)return{ok:false,error:"Telegram authorization expired"};p.delete("hash");const s=[...p.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>k+"="+v).join("\n"),e=new TextEncoder(),secret=await hmac(e.encode("WebAppData"),e.encode(botToken)),calc=toHex(await hmac(secret,e.encode(s)));if(!constantTimeEqual(calc,hash))return{ok:false,error:"Invalid Telegram signature"};let u;try{u=JSON.parse(raw)}catch{return{ok:false,error:"Invalid Telegram user"}}return u?.id?{ok:true,user:{id:u.id,first_name:u.first_name??null,username:u.username??null}}:{ok:false,error:"Telegram user not found"}}
-async function hmac(key,data){const k=await crypto.subtle.importKey("raw",key,{name:"HMAC",hash:"SHA-256"},false,["sign"]);return crypto.subtle.sign("HMAC",k,data)}function toHex(b){return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}function constantTimeEqual(a,b){if(a.length!==b.length)return false;let x=0;for(let i=0;i<a.length;i++)x|=a.charCodeAt(i)^b.charCodeAt(i);return x===0}function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=UTF-8","cache-control":"no-store"}}) }
+async function hmac(key,data){const k=await crypto.subtle.importKey("raw",key,{name:"HMAC",hash:"SHA-256"},false,["sign"]);return crypto.subtle.sign("HMAC",k,data)}function toHex(b){return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}function constantTimeEqual(a,b){if(a.length!==b.length)return false;let x=0;for(let i=0;i<a.length;i++)x|=a.charCodeAt(i)^b.charCodeAt(i);return x===0}function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=UTF-8","cache-control":"no-store"}})}
