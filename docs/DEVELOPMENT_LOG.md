@@ -10,18 +10,30 @@
 - Added `docs/GAME_API.md`.
 - Added Memory Grid specification and isolated client module.
 - Confirmed Cloudflare entrypoint remains `worker_entry.js`.
+- Added `public.games.route` as the route registry field.
+- Added `GET /api/games`, returning only enabled games with configured routes.
+- Made the home navigation consume the registry instead of hardcoding Memory Grid.
+- Added a route-level enabled check for Memory Grid.
+- Added `public.player_game_analytics` for aggregate per-player/per-game telemetry.
 
 ### Current architecture
 ```
 Telegram WebApp
   -> Worker entry
+     -> registry catalog (/api/games)
      -> Telegram verification
-     -> normalized game API
+     -> normalized game API (/api/game-sessions)
         -> Supabase RPC
            -> players
            -> game_sessions
            -> player_game_stats
+     -> aggregate analytics (player_game_analytics)
 ```
 
+### Safety baseline
+- `worker.js` remains the legacy Lightning UI and was not structurally rewritten.
+- Backup branch created before registry changes: `backup-before-game-registry-2026-09-03`.
+- Disabling a game does not delete historical sessions.
+
 ### Next implementation task
-Integrate the isolated Memory Grid module into a production route/navigation shell without altering Lightning markup or behavior, then verify persistence end-to-end.
+Build the player-facing progress/analytics layer on top of `player_game_analytics`, then continue with the next game from the product roadmap. Navigation and availability remain registry-driven.
