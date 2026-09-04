@@ -1,6 +1,59 @@
-import app from "./progression_entry.js";
+import app from "./worker_entry.js";
+import { validateTelegram } from "./telegram_auth.js";
+import { renderProgressPage } from "./progress_page.js";
 import { renderFocusRibbonHtml } from "./games/focus_ribbon_v2.js";
 import { renderSwitcherHtml } from "./games/switcher_v2.js";
-const FALLBACK=new Set(["focus_ribbon","switcher"]);
-export default{async fetch(request,env,ctx){const u=new URL(request.url);if(request.method==="GET"&&(u.pathname==="/games/focus-ribbon"||u.pathname==="/games/switcher")){const code=u.pathname.endsWith("focus-ribbon")?"focus_ribbon":"switcher";if(!(await enabled(env,code)))return new Response(JSON.stringify({ok:false,error:"Game disabled"}),{status:404,headers:{"content-type":"application/json","cache-control":"no-store"}});return new Response(code==="focus_ribbon"?renderFocusRibbonHtml():renderSwitcherHtml(),{headers:{"content-type":"text/html; charset=UTF-8","cache-control":"no-store","x-content-type-options":"nosniff"}})}const response=await app.fetch(request,env,ctx);if(request.method!=="GET"||u.pathname!=="/"||!response.ok||!response.headers.get("content-type")?.includes("text/html"))return response;let html=await response.text();html=html.replace(/<script>\(\(\)=>\{const renderCatalog=async\(\)=>\{[\s\S]*?new MutationObserver\([\s\S]*?<\/script>/g,"");const s='<script>(()=>{const a=document.getElementById("app");if(!a)return;let saved=false;new MutationObserver(()=>{if(saved)return;const h=a.querySelector("h1"),m=h?.textContent.match(/^(\\d+)\\s*мс$/);if(!m)return;const initData=window.Telegram?.WebApp?.initData;if(!initData)return;saved=true;fetch("/api/game-sessions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({initData,game_code:"lightning",score:Math.max(0,1000-Number(m[1])),difficulty:1,reaction_ms:Number(m[1]),accuracy_percent:100,error_count:0,false_starts:0})}).catch(()=>{saved=false})}).observe(a,{childList:true,subtree:true})})()</script>';const h=new Headers(response.headers);h.set("cache-control","no-store");return new Response(html.replace("</body>",s+"</body>"),{status:response.status,headers:h})}};
-async function enabled(env,code){const key=env.SUPABASE_SECRET_KEY;if(!env.SUPABASE_URL||!key)return FALLBACK.has(code);try{const r=await fetch(env.SUPABASE_URL.replace(/\/$/,"")+"/rest/v1/games?select=code&code=eq."+encodeURIComponent(code)+"&enabled=eq.true&limit=1",{headers:{apikey:key,Authorization:"Bearer "+key}});if(!r.ok)return FALLBACK.has(code);const x=await r.json();return Array.isArray(x)&&x.length===1}catch{return FALLBACK.has(code)}}
+
+const CATALOG=[
+  {code:"lightning",title:"Молния",icon:"⚡",route:"/"},
+  {code:"memory_grid",title:"Память-сетка",icon:"🧠",route:"/games/memory-grid"},
+  {code:"switcher",title:"Переключатель",icon:"🔄",route:"/games/switcher"},
+  {code:"focus_ribbon",title:"Фокус-лента",icon:"🎯",route:"/games/focus-ribbon"}
+];
+const enabledCache=new Map();
+
+export default {async fetch(request,env,ctx){
+  const u=new URL(request.url);
+  if(request.method==="GET"&&u.pathname==="/progress")return renderProgressPage();
+  if(request.method==="GET"&&u.pathname==="/api/progress")return progressApi(request,env);
+  if(request.method==="GET"&&(u.pathname==="/games/focus-ribbon"||u.pathname==="/games/switcher")){
+    const code=u.pathname.endsWith("focus-ribbon")?"focus_ribbon":"switcher";
+    if(!(await gameEnabled(env,code)))return json({ok:false,error:"Game disabled"},404);
+    return new Response(code==="focus_ribbon"?renderFocusRibbonHtml():renderSwitcherHtml(),{headers:htmlHeaders()});
+  }
+  const response=await app.fetch(request,env,ctx);
+  if(request.method!=="GET"||u.pathname!=="/"||!response.ok||!response.headers.get("content-type")?.includes("text/html"))return response;
+  let html=await response.text();
+  html=html.replace(/<script>\(\(\)=>\{const renderCatalog=async[\s\S]*?<\/script>/g,"");
+  const script='<script>(()=>{const C='+JSON.stringify(CATALOG)+',s=document.getElementById("start");if(!s)return;let w=document.getElementById("game-catalog");if(!w){w=document.createElement("div");w.id="game-catalog";s.insertAdjacentElement("afterend",w)}w.innerHTML="";C.filter(g=>g.code!=="lightning").forEach(g=>{const b=document.createElement("button");b.type="button";b.className="secondary";b.textContent=g.icon+" "+g.title;b.onclick=()=>location.replace(g.route);w.appendChild(b)});let p=document.getElementById("progress-link");if(!p){p=document.createElement("button");p.id="progress-link";p.type="button";p.className="secondary";p.textContent="📈 Мой прогресс";p.onclick=()=>location.replace("/progress");w.insertAdjacentElement("afterend",p)}})()</script>';
+  const headers=new Headers(response.headers);headers.set("cache-control","no-store");
+  return new Response(html.replace("</body>",script+"</body>"),{status:response.status,headers});
+}};
+
+async function progressApi(request,env){
+  const a=await validateTelegram(request.headers.get("x-telegram-init-data"),env.TELEGRAM_BOT_TOKEN);
+  if(!a.ok)return json({ok:false,error:a.error},401);
+  const key=env.SUPABASE_SECRET_KEY;
+  if(!env.SUPABASE_URL||!key)return json({ok:false,error:"Server storage configuration error"},500);
+  const base=env.SUPABASE_URL.replace(/\/$/,"")+"/rest/v1/",h={apikey:key,Authorization:"Bearer "+key};
+  try{
+    const p=await one(base+"players?select=id,first_name,character_name,level,experience,coins&telegram_id=eq."+encodeURIComponent(a.user.id)+"&limit=1",h);
+    if(!p)return json({ok:true,player:{first_name:a.user.first_name||"Герой",character_name:"Нейрогерой",level:1,experience:0,coins:0},skills:[],achievements:emptyAchievements(),quests:emptyQuests()});
+    const [st,games,sessions]=await Promise.all([
+      rows(base+"player_game_stats?select=game_code,sessions_count,best_score,best_accuracy_percent&player_id=eq."+p.id,h),
+      rows(base+"games?select=code,title,skill_domain&enabled=eq.true&order=sort_order.asc,code.asc",h),
+      rows(base+"game_sessions?select=game_code,score,accuracy_percent,created_at&player_id=eq."+p.id+"&order=created_at.desc&limit=500",h)
+    ]);
+    const by=Object.fromEntries(st.map(x=>[x.game_code,x])),all=Array.isArray(sessions)?sessions:[],today=new Date().toISOString().slice(0,10),todayRows=all.filter(x=>String(x.created_at||"").slice(0,10)===today),labels={reaction:"Скорость реакции",working_memory:"Рабочая память",cognitive_flexibility:"Когнитивная гибкость",sustained_attention:"Устойчивое внимание"};
+    const skills=games.map(g=>{const s=by[g.code]||{};return{code:g.code,title:g.title,skill_title:labels[g.skill_domain]||g.title,sessions:Number(s.sessions_count||0),best_score:s.best_score==null?null:Number(s.best_score),accuracy:s.best_accuracy_percent==null?null:Math.round(Number(s.best_accuracy_percent))}});
+    const total=all.length,distinct=new Set(all.map(x=>x.game_code)).size,scoreToday=todayRows.reduce((n,x)=>n+(Number(x.score)||0),0),high=all.some(x=>Number(x.accuracy_percent)>=90);
+    return json({ok:true,player:{first_name:p.first_name||a.user.first_name||"Герой",character_name:p.character_name||"Нейрогерой",level:Number(p.level||1),experience:Number(p.experience||0),coins:Number(p.coins||0)},skills,achievements:[{title:"Первый шаг",text:"Сыграй первую тренировку",done:total>0,progress:Math.min(total,1),goal:1},{title:"Разминка",text:"Сыграй 3 тренировки",done:total>=3,progress:Math.min(total,3),goal:3},{title:"Точный прицел",text:"Точность 90%+",done:high,progress:high?1:0,goal:1},{title:"Мастер тренировок",text:"Сыграй 10 тренировок",done:total>=10,progress:Math.min(total,10),goal:10},{title:"Исследователь",text:"Попробуй 4 игры",done:distinct>=4,progress:Math.min(distinct,4),goal:4}],quests:[{title:"Две тренировки",text:"Сыграй 2 раза сегодня",progress:Math.min(todayRows.length,2),goal:2,reward:20},{title:"Набор очков",text:"Набери 500 очков сегодня",progress:Math.min(Math.round(scoreToday),500),goal:500,reward:30},{title:"Чистая серия",text:"2 тренировки с точностью 80%+",progress:Math.min(todayRows.filter(x=>Number(x.accuracy_percent)>=80).length,2),goal:2,reward:30}]});
+  }catch(_){return json({ok:false,error:"Could not load progress"},502)}
+}
+function emptyAchievements(){return[{title:"Первый шаг",text:"Сыграй первую тренировку",done:false,progress:0,goal:1},{title:"Разминка",text:"Сыграй 3 тренировки",done:false,progress:0,goal:3},{title:"Точный прицел",text:"Точность 90%+",done:false,progress:0,goal:1},{title:"Мастер тренировок",text:"Сыграй 10 тренировок",done:false,progress:0,goal:10},{title:"Исследователь",text:"Попробуй 4 игры",done:false,progress:0,goal:4}]}
+function emptyQuests(){return[{title:"Две тренировки",text:"Сыграй 2 раза сегодня",progress:0,goal:2,reward:20},{title:"Набор очков",text:"Набери 500 очков сегодня",progress:0,goal:500,reward:30},{title:"Чистая серия",text:"2 тренировки с точностью 80%+",progress:0,goal:2,reward:30}]}
+async function gameEnabled(env,code){const now=Date.now(),cached=enabledCache.get(code);if(cached&&cached.expires>now)return cached.value;const key=env.SUPABASE_SECRET_KEY;if(!env.SUPABASE_URL||!key)return CATALOG.some(g=>g.code===code);try{const r=await fetch(env.SUPABASE_URL.replace(/\/$/,"")+"/rest/v1/games?select=code&code=eq."+encodeURIComponent(code)+"&enabled=eq.true&limit=1",{headers:{apikey:key,Authorization:"Bearer "+key}});if(!r.ok)return CATALOG.some(g=>g.code===code);const v=await r.json(),value=Array.isArray(v)&&v.length===1;enabledCache.set(code,{value,expires:now+30000});return value}catch{return CATALOG.some(g=>g.code===code)}}
+async function rows(url,h){const r=await fetch(url,{headers:h});if(!r.ok)throw Error("query");const v=await r.json();return Array.isArray(v)?v:[]}
+async function one(url,h){const v=await rows(url,h);return v[0]||null}
+function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=UTF-8","cache-control":"no-store"}})}
+function htmlHeaders(){return{"content-type":"text/html; charset=UTF-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin"}}
