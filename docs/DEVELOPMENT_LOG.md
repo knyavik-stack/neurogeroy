@@ -12,6 +12,7 @@
 - Added GitHub JavaScript syntax validation workflows.
 - Found and fixed a critical recursive home-page observer loop. The compatibility observer called `renderCatalog()` on every mutation, while `renderCatalog()` changed the observed DOM; this could continuously retrigger itself and cause excessive CPU/DOM work, slow loading, freezes and potentially Cloudflare Worker 1101 symptoms.
 - Catalog rendering is now performed once. The remaining observer only scans Lightning result changes inside `#app` and never mutates the DOM from its callback.
+- Found and fixed the direct cause of the reported Cloudflare `/progress` exception: the Worker `fetch()` handler returned the string produced by `renderProgressPage()` instead of a `Response`. Cloudflare Workers requires the fetch handler Promise to resolve to a `Response`; `/progress` now wraps the rendered HTML in `new Response(...)` with HTML headers.
 
 ### Backend verification
 - Verified `public.games`: exactly four enabled playable games are registered — Lightning, Memory Grid, Switcher and Focus Ribbon. Pattern and Dual Stream remain disabled.
@@ -30,4 +31,4 @@
 The repository is connected to Cloudflare Workers Builds, but the current tool connection does not expose Cloudflare deployment/build logs. GitHub Actions is triggered by pushes, but a successful syntax workflow is not proof of Cloudflare production deployment. A real Telegram WebView smoke test is still required.
 
 ### Current gate
-Do not start parent binding/reporting or further game expansion until deployment is confirmed and the Telegram smoke path works: open app -> exactly one catalog -> open Progress -> complete each enabled game -> result persists -> return to menu -> Progress shows the new session/player values -> reopen Mini App and verify persistence again.
+The code fixes for the reported `/progress` 1101 are complete in GitHub commit `5c76d348522768603c53634643f51f66a43efdd7`. Do not start parent binding/reporting or further game expansion until this commit is deployed and the Telegram smoke path works: open app -> exactly one catalog -> open Progress -> no Worker 1101 -> complete each enabled game -> result persists -> return to menu -> Progress shows the new session/player values -> reopen Mini App and verify persistence again.
