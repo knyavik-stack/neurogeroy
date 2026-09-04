@@ -10,7 +10,8 @@
 - Hardened Switcher and Focus Ribbon controls by binding buttons through `document.getElementById` and using the common home navigation path.
 - Recorded Focus Ribbon enablement in the Supabase migration history and repository migration file.
 - Added GitHub JavaScript syntax validation workflows.
-- Scoped the home-page compatibility MutationObserver to `#app` child-list changes only. The previous document-wide subtree observer could process unrelated DOM mutations and add avoidable Telegram WebView overhead. Lightning result persistence remains active because Lightning replaces content inside `#app`.
+- Found and fixed a critical recursive home-page observer loop. The compatibility observer called `renderCatalog()` on every mutation, while `renderCatalog()` changed the observed DOM; this could continuously retrigger itself and cause excessive CPU/DOM work, slow loading, freezes and potentially Cloudflare Worker 1101 symptoms.
+- Catalog rendering is now performed once. The remaining observer only scans Lightning result changes inside `#app` and never mutates the DOM from its callback.
 
 ### Backend verification
 - Verified `public.games`: exactly four enabled playable games are registered — Lightning, Memory Grid, Switcher and Focus Ribbon. Pattern and Dual Stream remain disabled.
@@ -26,7 +27,7 @@
 - Lightning remains legacy and is not yet GDD-complete: the current implementation is a single reaction round and does not provide the GDD-required session-level average reaction, accuracy and false-press metrics. This remains P1 and must be addressed before expanding the product beyond stabilization.
 
 ### Deployment boundary
-The repository is connected to Cloudflare Workers Builds, but the current tool connection does not expose Cloudflare deployment/build logs. GitHub Actions confirms JavaScript syntax validation for the latest stabilization commit, but this is not proof of Cloudflare production deployment. A real Telegram WebView smoke test is still required.
+The repository is connected to Cloudflare Workers Builds, but the current tool connection does not expose Cloudflare deployment/build logs. GitHub Actions is triggered by pushes, but a successful syntax workflow is not proof of Cloudflare production deployment. A real Telegram WebView smoke test is still required.
 
 ### Current gate
 Do not start parent binding/reporting or further game expansion until deployment is confirmed and the Telegram smoke path works: open app -> exactly one catalog -> open Progress -> complete each enabled game -> result persists -> return to menu -> Progress shows the new session/player values -> reopen Mini App and verify persistence again.
