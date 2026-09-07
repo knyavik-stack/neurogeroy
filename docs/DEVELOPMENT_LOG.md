@@ -1,5 +1,37 @@
 # Development Log
 
+## 2026-09-07 — Navigation and loading stabilization
+
+### Fixed
+- Restored deterministic application navigation: `/` is now the main game menu, not the Lightning game.
+- Added the canonical Lightning route `/games/lightning` while preserving the legacy Lightning implementation without editing `worker.js`.
+- The Lightning route internally rewrites only the legacy request to `/`, so existing Lightning code continues to work while its public URL is isolated from the main menu.
+- Removed the root compatibility catalog injection. The old approach coupled the home page to the legacy Lightning DOM and was a source of navigation and observer complexity.
+- Main menu now renders the enabled game registry and has one explicit `Мой прогресс` route.
+- All v2 game `К играм` / `В меню` buttons now return to the real main menu at `/`.
+- Progress `К играм` already returns to `/`; the route is now a real menu, so it no longer reopens Lightning.
+- Lightning result persistence compatibility code is now attached only to `/games/lightning`, with a scoped observer that does not mutate the observed DOM.
+
+### Navigation contract
+- `/` — main menu
+- `/games/lightning` — Молния
+- `/games/memory-grid` — Память-сетка
+- `/games/switcher` — Переключатель
+- `/games/focus-ribbon` — Фокус-лента
+- `/progress` — Мой прогресс
+- From every game: `К играм` / `В меню` -> `/`.
+- From a result screen: `Ещё раз` stays in the same game; `В меню` -> `/`.
+- From Progress: `К играм` -> `/`.
+
+### Important implementation boundary
+- `worker.js` was not modified. Its current legacy Lightning implementation remains protected.
+- The previous root observer recursion fix remains preserved; the new root no longer depends on that compatibility catalog observer.
+
+### Verification boundary
+- Repository code was inspected directly before the change.
+- GitHub commit created: `fbbda1ef33cb4fb09ff67a361112cdc9c64165dd`.
+- Cloudflare deployment status and a real Telegram WebView smoke test are not available through the current connection, so production loading is not claimed as verified yet.
+
 ## 2026-09-04 — Stabilization pass before next MVP
 
 ### Fixed
@@ -31,4 +63,4 @@
 The repository is connected to Cloudflare Workers Builds, but the current tool connection does not expose Cloudflare deployment/build logs. GitHub Actions is triggered by pushes, but a successful syntax workflow is not proof of Cloudflare production deployment. A real Telegram WebView smoke test is still required.
 
 ### Current gate
-The code fixes for the reported `/progress` 1101 are complete in GitHub commit `5c76d348522768603c53634643f51f66a43efdd7`. Do not start parent binding/reporting or further game expansion until this commit is deployed and the Telegram smoke path works: open app -> exactly one catalog -> open Progress -> no Worker 1101 -> complete each enabled game -> result persists -> return to menu -> Progress shows the new session/player values -> reopen Mini App and verify persistence again.
+The navigation/loading stabilization commit is `fbbda1ef33cb4fb09ff67a361112cdc9c64165dd`. Do not start parent binding/reporting or further game expansion until this commit is deployed and the Telegram smoke path works: open app -> main menu -> open each enabled game -> finish -> return to menu -> open Progress -> verify persistence -> reopen Mini App and verify persistence again.
