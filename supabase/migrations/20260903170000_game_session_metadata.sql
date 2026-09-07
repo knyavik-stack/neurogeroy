@@ -1,6 +1,11 @@
 alter table public.game_sessions add column if not exists metadata jsonb not null default '{}'::jsonb;
 alter table public.game_sessions add constraint game_sessions_metadata_object check (jsonb_typeof(metadata) = 'object');
 
+-- The final normalized RPC replaces all earlier overloads and the legacy Lightning RPC.
+drop function if exists public.record_lightning_session(bigint,text,text,integer,integer,integer);
+drop function if exists public.record_game_session(bigint,text,text,text,integer,integer,integer,integer,numeric);
+drop function if exists public.record_game_session(bigint,text,text,text,integer,integer,integer,integer,numeric,integer,integer,integer,integer);
+
 drop function if exists public.record_game_session(bigint,text,text,text,integer,integer,integer,integer,numeric,integer,integer,integer,integer,jsonb);
 
 create function public.record_game_session(
