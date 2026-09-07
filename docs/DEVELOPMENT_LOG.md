@@ -13,19 +13,20 @@
 - Applied the same exact RPC cleanup to the live Supabase project. Live verification now shows exactly one `record_game_session` signature: the normalized 15-parameter version; the legacy `record_lightning_session` and older overloads are gone.
 - Verified RPC permissions: `public`, `anon`, and `authenticated` cannot execute `record_game_session`; only `service_role` can.
 - Added `supabase/migrations/20260907000000_remove_legacy_game_session_rpcs.sql` so the cleanup is reproducible from the repository.
-- Added centralized HTML hardening in `root_entry.js`: Telegram WebApp SDK is changed to `defer`, and failed `/api/game-sessions` responses are surfaced to the player instead of remaining completely silent.
-- Extended Memory Grid v2 from a single 5–20 second attempt to an 8-round session, with aggregate accuracy, errors, input timings and total session duration. The intended session window is now approximately 40–90 seconds rather than a single short attempt.
+- Added centralized HTML hardening in `root_entry.js`: failed `/api/game-sessions` responses are surfaced to the player instead of remaining completely silent. Telegram SDK loading was deliberately not changed to `defer` at the root layer because the existing inline game code captures `Telegram.WebApp` during initial execution; applying `defer` without first changing that initialization order would break authentication and persistence. The defer optimization remains a separate safe-loading task.
+- Extended Memory Grid v2 from a single short attempt to an 8-round session, with aggregate accuracy, errors, input timings and total session duration. Input timing now uses real per-click timestamps, and failed rounds retain already-correct inputs in the aggregate score.
 
 ### Verification
 - Local Node syntax check passed for the rewritten `worker_entry.js` and the new Memory Grid v2 source.
 - Live Supabase RPC smoke test completed inside a transaction and rolled back. The normalized RPC successfully created the expected player/session/stats objects and returned level, score, duration, error, experience and coins; the rollback left `players`, `game_sessions`, and `player_game_stats` at 0 rows.
-- Live Supabase function inspection confirms only the normalized 15-argument `record_game_session` remains.
+- Live Supabase function inspection confirms only the normalized 15-argument `record_game_session` remains, with execution restricted to `service_role`.
 - Cloudflare deployment and Telegram WebView smoke test remain unverified because this connection does not expose Cloudflare deployment logs or a browser.
 
 ### Remaining audit items
 - The repository still has historical migration drift versus the Supabase migration history. The current schema is represented by the repository's consolidated migrations plus the new cleanup migration, but the old applied migration history has not been rewritten, which would be unsafe on a live database.
 - Lightning remains legacy/GDD-incomplete. Its persistence compatibility layer still extracts the displayed reaction result from the legacy UI; this is deliberately left for the dedicated Lightning normalization pass rather than mixing it into the structural cleanup.
 - Server-side anti-cheat/recalculation of game scores is not yet implemented.
+- Safe Telegram SDK defer requires a coordinated initialization change in the game pages; it is not safe as a blind HTML transformation.
 - Edge caching remains disabled by `no-store`; this is deferred until game/session correctness is production-verified.
 
 ## 2026-09-07 — Navigation and loading stabilization
