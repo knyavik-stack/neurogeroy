@@ -16,7 +16,7 @@ const enabledCache=new Map();
 
 export default{async fetch(request,env,ctx){
   const u=new URL(request.url);
-  if(request.method==="GET"&&u.pathname==="/")return new Response(enhanceHtml(await menuHtml(env)),{headers:htmlHeaders()});
+  if(request.method==="GET"&&u.pathname==="/")return new Response(enhanceHtml(menuHtml()),{headers:htmlHeaders()});
   if(request.method==="GET"&&u.pathname==="/games/lightning"){
     if(!(await gameEnabled(env,"lightning")))return json({ok:false,error:"Game disabled"},404);
     const target=new URL(request.url);target.pathname="/";
@@ -44,10 +44,8 @@ function enhanceHtml(html){
   return html.replace("</body>",guard+"</body>");
 }
 
-async function menuHtml(env){
-  let games=CATALOG;
-  try{const key=env.SUPABASE_SECRET_KEY;if(env.SUPABASE_URL&&key){const r=await fetch(env.SUPABASE_URL.replace(/\/$/,"")+"/rest/v1/games?select=code,title,skill_domain,sort_order&enabled=eq.true&order=sort_order.asc,code.asc",{headers:{apikey:key,Authorization:"Bearer "+key}});if(r.ok){const rows=await r.json();if(Array.isArray(rows)&&rows.length)games=rows.map(g=>{const c=CATALOG.find(x=>x.code===g.code);return c?{...c,title:g.title||c.title}:null}).filter(Boolean)}}}catch(_){games=CATALOG}
-  const cards=games.map(g=>'<button class="game" data-route="'+g.route+'"><span>'+g.icon+'</span><b>'+esc(g.title)+'</b></button>').join("");
+function menuHtml(){
+  const cards=CATALOG.map(g=>'<button class="game" data-route="'+g.route+'"><span>'+g.icon+'</span><b>'+esc(g.title)+'</b></button>').join("");
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="https://telegram.org/js/telegram-web-app.js"></script><title>НейроГерой · Игры</title><style>:root{--bg:#101322;--card:#1b2035;--text:#fff;--muted:#b9c0dc}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}main{width:min(100%,600px);margin:auto;padding:24px 18px 32px}.hero{padding:24px 4px 14px}h1{font-size:40px;margin:8px 0}.muted{color:var(--muted);line-height:1.5}.grid{display:grid;gap:12px}.game{width:100%;display:flex;align-items:center;gap:16px;padding:18px;border:1px solid #ffffff18;border-radius:20px;background:var(--card);color:#fff;text-align:left;font-size:19px;box-shadow:0 12px 30px #0003}.game span{font-size:30px}.progress{margin-top:14px;width:100%;padding:16px;border-radius:18px;border:1px solid #ffffff30;background:transparent;color:#fff;font-size:16px;font-weight:700}</style></head><body><main><section class="hero"><div class="muted">НЕЙРОГЕРОЙ</div><h1>Выбери тренировку</h1><p class="muted">Прокачивай внимание, память, скорость реакции и гибкость мышления.</p></section><section class="grid">'+cards+'</section><button class="progress" id="progress">📈 Мой прогресс</button></main><script>const tg=window.Telegram?.WebApp;try{tg?.ready();tg?.expand();tg?.BackButton?.hide()}catch(_){}document.querySelectorAll(".game").forEach(b=>b.onclick=()=>location.replace(b.dataset.route));document.getElementById("progress").onclick=()=>location.replace("/progress");</script></body></html>';
 }
 function esc(x){return String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))}
