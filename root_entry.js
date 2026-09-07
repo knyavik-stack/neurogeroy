@@ -18,7 +18,7 @@ export default{async fetch(request,env,ctx){
   const u=new URL(request.url);
 
   if(request.method==="GET"&&u.pathname==="/"){
-    return new Response(await menuHtml(env),{headers:htmlHeaders()});
+    return new Response(enhanceHtml(await menuHtml(env)),{headers:htmlHeaders()});
   }
 
   if(request.method==="GET"&&u.pathname==="/games/lightning"){
@@ -28,23 +28,29 @@ export default{async fetch(request,env,ctx){
     const response=await legacy.fetch(legacyRequest,env,ctx);
     if(!response.ok||!response.headers.get("content-type")?.includes("text/html"))return response;
     let html=await response.text();
-    const script='<script>(()=>{let saved=false,falseStarts=0;const original=window.falseStart;if(typeof original==="function")window.falseStart=function(...a){falseStarts++;return original.apply(this,a)};const save=async ms=>{if(saved||!Number.isInteger(ms)||ms<1||ms>60000)return;saved=true;const initData=window.Telegram?.WebApp?.initData;if(!initData)return;try{await fetch("/api/game-sessions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({initData,game_code:"lightning",score:Math.max(0,1000-ms),difficulty:1,reaction_ms:ms,false_starts:falseStarts})})}catch(_){saved=false}};const scan=()=>{const h=document.querySelector("h1");const m=h?.textContent.match(/^(\\d+)\\s*мс$/);if(m)save(Number(m[1]))};const root=document.getElementById("app")||document.body;new MutationObserver(scan).observe(root,{childList:true});scan()})()</script>';
+    const script='<script>(()=>{let saved=false,falseStarts=0;const original=window.falseStart;if(typeof original==="function")window.falseStart=function(...a){falseStarts++;return original.apply(this,a)};const save=async ms=>{if(saved||!Number.isInteger(ms)||ms<1||ms>60000)return;saved=true;const initData=window.Telegram?.WebApp?.initData;if(!initData)return;try{const r=await fetch("/api/game-sessions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({initData,game_code:"lightning",score:Math.max(0,1000-ms),difficulty:1,reaction_ms:ms,false_starts:falseStarts})});if(!r.ok)saved=false}catch(_){saved=false}};const scan=()=>{const h=document.querySelector("h1");const m=h?.textContent.match(/^(\\d+)\\s*мс$/);if(m)save(Number(m[1]))};const root=document.getElementById("app")||document.body;new MutationObserver(scan).observe(root,{childList:true});scan()})()</script>';
     const headers=new Headers(response.headers);headers.set("cache-control","no-store");
-    return new Response(html.replace("</body>",script+"</body>"),{status:response.status,headers});
+    return new Response(enhanceHtml(html.replace("</body>",script+"</body>")),{status:response.status,headers});
   }
 
-  if(request.method==="GET"&&u.pathname==="/progress")return new Response(renderProgressPage(),{headers:htmlHeaders()});
+  if(request.method==="GET"&&u.pathname==="/progress")return new Response(enhanceHtml(renderProgressPage()),{headers:htmlHeaders()});
   if(request.method==="GET"&&u.pathname==="/api/progress")return progressApi(request,env);
 
   if(request.method==="GET"&&(u.pathname==="/games/memory-grid"||u.pathname==="/games/focus-ribbon"||u.pathname==="/games/switcher")){
     const code=u.pathname.endsWith("memory-grid")?"memory_grid":u.pathname.endsWith("focus-ribbon")?"focus_ribbon":"switcher";
     if(!(await gameEnabled(env,code)))return json({ok:false,error:"Game disabled"},404);
     const html=code==="memory_grid"?renderMemoryGridHtml():code==="focus_ribbon"?renderFocusRibbonHtml():renderSwitcherHtml();
-    return new Response(html,{headers:htmlHeaders()});
+    return new Response(enhanceHtml(html),{headers:htmlHeaders()});
   }
 
   return app.fetch(request,env,ctx);
 }};
+
+function enhanceHtml(html){
+  const withDefer=html.replace(/<script\s+src=["']https:\/\/telegram\.org\/js\/telegram-web-app\.js["']\s*>/gi,'<script defer src="https://telegram.org/js/telegram-web-app.js">');
+  const guard='<script>(()=>{const nativeFetch=window.fetch.bind(window);const show=(retry)=>{if(document.getElementById("save-error"))return;const box=document.createElement("div");box.id="save-error";box.style="position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;padding:14px 16px;border-radius:16px;background:#2a1b25;color:#fff;font:700 15px Arial,sans-serif;box-shadow:0 12px 35px #0008;text-align:center";box.innerHTML="Не удалось сохранить результат.<br><button id=\"save-retry\" style=\"margin-top:10px;padding:10px 16px;border-radius:12px;border:0;font-weight:700\">Повторить</button>";document.body.appendChild(box);box.querySelector("#save-retry").onclick=async()=>{box.remove();await retry()}};window.fetch=async(...args)=>{const r=await nativeFetch(...args);try{const input=args[0],url=typeof input==="string"?input:input?.url||"",method=(args[1]?.method||input?.method||"GET").toUpperCase();if(method==="POST"&&url.includes("/api/game-sessions")&&!r.ok){let body=null;try{body=args[1]?.body?String(args[1].body):null}catch(_){};show(async()=>{if(body){const rr=await nativeFetch(url,{method:"POST",headers:{"content-type":"application/json"},body});if(!rr.ok)show(async()=>{})}})}}catch(_){}return r}})()</script>';
+  return withDefer.replace("</body>",guard+"</body>");
+}
 
 async function menuHtml(env){
   let games=CATALOG;
