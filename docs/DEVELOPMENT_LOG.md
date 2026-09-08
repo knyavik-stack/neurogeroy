@@ -1,5 +1,36 @@
 # Development Log
 
+## 2026-09-08 — UI recovery, fast navigation and game-session reliability
+
+### Fixed
+- Rebuilt the main `/` screen around the approved NeuroGeroy visual direction: dark space/neural background, cyan/violet/orange accents, character-style hero block, explicit `КТО Я` section, explicit `ВО ЧТО ИГРАТЬ` section, skill labels and short game descriptions.
+- Restored the product hierarchy that was lost during the earlier structural stabilization: identity first, game choice second, progress third.
+- Removed the Supabase `games` lookup from normal GET navigation. The four currently enabled games are already known in the product catalog, so opening a game no longer waits for a database request. This removes an avoidable network dependency from the critical tap-to-game path.
+- Changed game and menu navigation to direct `location.href` navigation, avoiding the previous nested `replace()` behavior in Telegram WebView.
+- Reworked Telegram SDK loading on the root-rendered v2 pages from a blocking `<script src=...>` dependency to an asynchronous bootstrap. The v2 games now resolve `Telegram.WebApp` dynamically through `getTelegram()`, so the SDK can load without delaying first paint or breaking later persistence calls.
+- Reworked Memory Grid, Switcher and Focus Ribbon to use the same non-blocking Telegram access pattern and improved their visual hierarchy to match the NeuroGeroy brand direction.
+- Rebuilt the Progress screen with the same branded visual system and made it explicitly wait for the Telegram SDK before requesting `/api/progress`.
+- Strengthened the save-error overlay so both non-OK responses and network exceptions on `/api/game-sessions` are surfaced to the player.
+- Kept `worker.js` untouched during this pass; Lightning remains isolated behind `/games/lightning` and its compatibility bridge.
+
+### Game/session reliability
+- Memory Grid still runs 8 rounds and now uses the non-blocking Telegram integration for result persistence.
+- Switcher now uses the same persistence path and direct menu navigation.
+- Focus Ribbon now uses the same persistence path and direct menu navigation.
+- Progress continues to read the normalized player/session/statistics model through `/api/progress`.
+
+### Verification
+- GitHub Actions syntax check for the Focus Ribbon change completed successfully (`run #69`).
+- A new repository-wide syntax check was triggered automatically for the final Progress change (`run #70`); its completion must be observed before treating the latest commit as syntax-verified.
+- Cloudflare production deployment and a real Telegram WebView smoke test are still not exposed by the current connection. Production availability is therefore not claimed as verified.
+
+### Known remaining work
+- Lightning is still the legacy/GDD-incomplete game and needs a dedicated session-level normalization pass.
+- The root asynchronous Telegram bootstrap is applied to pages that contain the official SDK tag; the menu currently remains functional without Telegram identity and falls back to `Герой` until the identity bootstrap is explicitly added to that page.
+- The brand reference images are stored in the repository `design/` area and were used as the visual direction; they are not yet served as first-class Worker assets, so the current UI uses lightweight CSS artwork rather than adding a multi-megabyte runtime image dependency.
+- Server-side anti-cheat/recalculation remains unresolved.
+- `no-store` remains intentional until a real Telegram production smoke test proves correctness.
+
 ## 2026-09-07 — Audit V2/V3 corrective pass
 
 ### Fixed
@@ -13,8 +44,8 @@
 - Applied the same exact RPC cleanup to the live Supabase project. Live verification now shows exactly one `record_game_session` signature: the normalized 15-parameter version; the legacy `record_lightning_session` and older overloads are gone.
 - Verified RPC permissions: `public`, `anon`, and `authenticated` cannot execute `record_game_session`; only `service_role` can.
 - Added `supabase/migrations/20260907000000_remove_legacy_game_session_rpcs.sql` so the cleanup is reproducible from the repository.
-- Added centralized HTML hardening in `root_entry.js`: failed `/api/game-sessions` responses are surfaced to the player instead of remaining completely silent. Telegram SDK loading was deliberately not changed to `defer` at the root layer because the existing inline game code captures `Telegram.WebApp` during initial execution; applying `defer` without first changing that initialization order would break authentication and persistence. The defer optimization remains a separate safe-loading task.
-- Extended Memory Grid v2 from a single short attempt to an 8-round session, with aggregate accuracy, errors, input timings and total session duration. Input timing now uses real per-click timestamps, and failed rounds retain already-correct inputs in the aggregate score.
+- Added centralized HTML hardening in `root_entry.js`: failed `/api/game-sessions` responses are surfaced to the player instead of remaining completely silent.
+- Extended Memory Grid v2 from a single short attempt to an 8-round session, with aggregate accuracy, errors, input timings and total session duration.
 
 ### Verification
 - Local Node syntax check passed for the rewritten `worker_entry.js` and the new Memory Grid v2 source.
@@ -23,23 +54,18 @@
 - Cloudflare deployment and Telegram WebView smoke test remain unverified because this connection does not expose Cloudflare deployment logs or a browser.
 
 ### Remaining audit items
-- The repository still has historical migration drift versus the Supabase migration history. The current schema is represented by the repository's consolidated migrations plus the new cleanup migration, but the old applied migration history has not been rewritten, which would be unsafe on a live database.
-- Lightning remains legacy/GDD-incomplete. Its persistence compatibility layer still extracts the displayed reaction result from the legacy UI; this is deliberately left for the dedicated Lightning normalization pass rather than mixing it into the structural cleanup.
+- Historical migration drift versus the Supabase migration history remains documented and is not being rewritten retroactively.
+- Lightning remains legacy/GDD-incomplete.
 - Server-side anti-cheat/recalculation of game scores is not yet implemented.
-- Safe Telegram SDK defer requires a coordinated initialization change in the game pages; it is not safe as a blind HTML transformation.
-- Edge caching remains disabled by `no-store`; this is deferred until game/session correctness is production-verified.
+- Edge caching remains disabled by `no-store` until correctness is production verified.
 
 ## 2026-09-07 — Navigation and loading stabilization
 
 ### Fixed
 - Restored deterministic application navigation: `/` is now the main game menu, not the Lightning game.
 - Added the canonical Lightning route `/games/lightning` while preserving the legacy Lightning implementation without editing `worker.js`.
-- The Lightning route internally rewrites only the legacy request to `/`, so existing Lightning code continues to work while its public URL is isolated from the main menu.
-- Removed the root compatibility catalog injection. The old approach coupled the home page to the legacy Lightning DOM and was a source of navigation and observer complexity.
-- Main menu now renders the enabled game registry and has one explicit `Мой прогресс` route.
 - All v2 game `К играм` / `В меню` buttons now return to the real main menu at `/`.
-- Progress `К играм` already returns to `/`; the route is now a real menu, so it no longer reopens Lightning.
-- Lightning result persistence compatibility code is now attached only to `/games/lightning`, with a scoped observer that does not mutate the observed DOM.
+- Progress `К играм` returns to `/`.
 
 ### Navigation contract
 - `/` — main menu
@@ -58,38 +84,4 @@
 
 ### Verification boundary
 - Repository code was inspected directly before the change.
-- GitHub commit created: `fbbda1ef33cb4fb09ff67a361112cdc9c64165dd`.
 - Cloudflare deployment status and a real Telegram WebView smoke test are not available through the current connection, so production loading is not claimed as verified yet.
-
-## 2026-09-04 — Stabilization pass before next MVP
-
-### Fixed
-- Removed the duplicate home catalog injection: the progression layer no longer renders a second game menu. The root entrypoint owns the compatibility catalog injection.
-- Current production entry chain is `root_entry.js -> worker_entry.js -> worker.js` for `/`, with direct root routes for Progress and the isolated v2 games.
-- Hardened `Мой прогресс`: it renders player data, per-game skill metrics, achievements and daily quests.
-- Changed navigation from progress and game screens to `location.replace('/')` to avoid stale nested navigation in the Mini App webview.
-- Hardened Switcher and Focus Ribbon controls by binding buttons through `document.getElementById` and using the common home navigation path.
-- Recorded Focus Ribbon enablement in the Supabase migration history and repository migration file.
-- Added GitHub JavaScript syntax validation workflows.
-- Found and fixed a critical recursive home-page observer loop. The compatibility observer called `renderCatalog()` on every mutation, while `renderCatalog()` changed the observed DOM; this could continuously retrigger itself and cause excessive CPU/DOM work, slow loading, freezes and potentially Cloudflare Worker 1101 symptoms.
-- Catalog rendering is now performed once. The remaining observer only scans Lightning result changes inside `#app` and never mutates the DOM from its callback.
-- Found and fixed the direct cause of the reported Cloudflare `/progress` exception: the Worker `fetch()` handler returned the string produced by `renderProgressPage()` instead of a `Response`. Cloudflare Workers requires the fetch handler Promise to resolve to a `Response`; `/progress` now wraps the rendered HTML in `new Response(...)` with HTML headers.
-
-### Backend verification
-- Verified `public.games`: exactly four enabled playable games are registered — Lightning, Memory Grid, Switcher and Focus Ribbon. Pattern and Dual Stream remain disabled.
-- Verified `game_sessions` contains the fields used by current persistence, including `created_at`, `completed_at`, `duration_ms`, `error_count`, `input_timing_ms` and `metadata`.
-- Verified current Progress reads `player_game_stats`, matching the table written by `record_game_session`; the historical `player_game_analytics` table is not used as the source of current Progress metrics.
-- Verified `record_game_session` exists with the current 15-parameter contract and writes player, session and per-game stats records.
-- Previous transactional persistence test was cleaned up; production currently has no player/session rows after that cleanup.
-
-### Game audit against GDD
-- Memory Grid v2 currently enforces exact sequence order and records full session duration, errors, grid size, pattern length, input timing and completion metadata.
-- Focus Ribbon v2 separates target hits, target misses, false hits and correct rejections and records full session duration.
-- Switcher v2 alternates COLOR/SHAPE rules and records rule changes, adaptation timings and full session duration.
-- Lightning remains legacy and is not yet GDD-complete: the current implementation is a single reaction round and does not provide the GDD-required session-level average reaction, accuracy and false-press metrics. This remains P1 and must be addressed before expanding the product beyond stabilization.
-
-### Deployment boundary
-The repository is connected to Cloudflare Workers Builds, but the current tool connection does not expose Cloudflare deployment/build logs. GitHub Actions is triggered by pushes, but a successful syntax workflow is not proof of Cloudflare production deployment. A real Telegram WebView smoke test is still required.
-
-### Current gate
-The navigation/loading stabilization commit is `fbbda1ef33cb4fb09ff67a361112cdc9c64165dd`. Do not start parent binding/reporting or further game expansion until this commit is deployed and the Telegram smoke path works: open app -> main menu -> open each enabled game -> finish -> return to menu -> open Progress -> verify persistence -> reopen Mini App and verify persistence again.
