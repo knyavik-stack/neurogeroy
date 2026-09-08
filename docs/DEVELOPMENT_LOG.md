@@ -1,5 +1,25 @@
 # Development Log
 
+## 2026-09-08 — Home UI iteration based on approved Home.jsx
+
+### Changed
+- Added `home_page.js` as the new root Home interface, using the supplied `Home.jsx` as the visual and interaction baseline.
+- Preserved the product hierarchy: hero/character first, game choice second, progress and skill feedback immediately after.
+- Added a persistent bottom navigation shell for Home, Hero, Games, Progress and More.
+- Connected the Home screen to the existing authenticated `/api/progress` endpoint for real player name, level, XP, coins, game statistics and daily quest progress.
+- Kept game actions on the existing working routes: Lightning, Memory Grid, Switcher and Focus Ribbon.
+- Kept Telegram WebApp initialization and the existing save-failure guard in the canonical `main_app.js` path.
+- Added responsive layout and Telegram safe-area handling.
+
+### Deliberate boundaries
+- Streak is not fabricated: the current progress API does not expose a streak value, so the UI does not invent one.
+- Character customization is currently a UI interaction only; no claim of server persistence is made because the current player API does not expose cosmetic fields.
+- The Hero and More navigation items do not pretend that separate production screens already exist.
+
+### Verification boundary
+- Source integration was committed to `main` in the canonical repository.
+- Static repository-side syntax/production smoke verification still requires the available CI/deployment surface or a real Telegram WebView test; this log does not claim a production smoke test that was not performed.
+
 ## 2026-09-08 — Canonical entrypoint and Telegram recovery
 
 ### Fixed
