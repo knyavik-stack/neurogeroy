@@ -1,22 +1,31 @@
 name: JavaScript syntax
+
 on:
   push:
     branches: [main]
+    paths:
+      - '**.js'
+      - '.github/workflows/javascript-syntax.yml'
   pull_request:
     branches: [main]
+    paths:
+      - '**.js'
+      - '.github/workflows/javascript-syntax.yml'
+
+concurrency:
+  group: javascript-syntax-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   syntax:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+      - uses: actions/checkout@v7
       - name: Check JavaScript syntax
         shell: bash
         run: |
           set -euo pipefail
+          node --version
           while IFS= read -r -d '' file; do
             node --check "$file"
           done < <(find . -type f -name '*.js' -not -path './node_modules/*' -print0)
