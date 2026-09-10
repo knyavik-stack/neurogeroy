@@ -1,5 +1,26 @@
 # Development Log
 
+## 2026-09-10 — Telegram runtime and navigation stabilization
+
+### Findings
+- `wrangler.toml` uses `root_entry.js` as the Worker entrypoint.
+- The repository has no deployment workflow: `.github/workflows/` currently contains only the JavaScript syntax workflow. Therefore a Git push does not, by itself, prove that the Cloudflare Worker used by the Telegram bot has been updated.
+- The repository does not contain the live Mini App URL, so production Telegram WebView reachability cannot be verified from the GitHub connection alone.
+- The previous `root_entry.js` mutated already-rendered HTML and added a second navigation layer. This was unnecessary and could produce duplicate controls.
+
+### Fixed
+- Added `/health` endpoint to `main_app.js` for a deployment smoke test without Telegram authorization.
+- Added a dedicated `/games` hub with all four current games and a real bottom navigation: Главная / Игры / Прогресс.
+- Wired Home's `Игры` tab to `/games` instead of only scrolling inside Home.
+- Wired existing Home navigation controls consistently through the canonical router.
+- Simplified `root_entry.js` to a transparent compatibility entrypoint that delegates directly to `main_app.js`; it no longer rewrites HTML.
+- Internal game/progress pages now use the canonical `‹ К ИГРАМ` return path.
+
+### Verification
+- GitHub Actions run `34506969658` for the `root_entry.js` change completed successfully.
+- GitHub Actions run `34507001325` for the navigation change reached the JavaScript syntax step successfully; final cleanup was still in progress at the time of this log update.
+- Production Telegram WebView smoke-test remains blocked only by the missing live Mini App URL/deployment visibility, not by a missing repository route.
+
 ## 2026-09-08 — Lightning rebuilt from ReactionGame.jsx
 
 ### Changed
