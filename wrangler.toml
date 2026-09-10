@@ -1,6 +1,11 @@
 name = "neurogeroy"
 main = "root_entry.js"
 compatibility_date = "2026-09-01"
+workers_dev = true
+
+[[routes]]
+pattern = "neurogeroy.ru"
+custom_domain = true
 
 [observability]
 enabled = true
