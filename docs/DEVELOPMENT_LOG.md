@@ -1,5 +1,29 @@
 # Development Log
 
+## 2026-09-11 — Home redesign and Telegram Mini App hardening
+
+### Changed
+- Главный экран `/` переведён на новый продуктовый визуальный язык по утверждённому референсу: тёмный sci-fi фон, cyan/blue/violet glow, оранжевая основная кнопка, крупный герой, квест дня, нейрометрики, игровые карточки и нижняя навигация.
+- Старый `home_page.js` оставлен тонким совместимым экспортом; фактическая разметка вынесена в `home_page_neon.js`.
+- Герой на главной теперь нарисован как встроенный SVG без фоновой фотографии. Фоновая картинка `design/image.jpg` больше не используется на Home.
+- Home остаётся адаптивным: desktop-композиция и отдельная мобильная компоновка для Telegram WebView.
+- Все игровые CTA ведут на существующие маршруты; кнопка `Играть` запускает `/games/lightning`.
+- Данные профиля и квеста продолжают загружаться из `/api/progress` по Telegram `initData`; демонстрационные значения не используются как реальные данные игрока.
+
+### Telegram
+- В Home добавлена явная инициализация `Telegram.WebApp`: `ready()`, `expand()`, цвета заголовка/фона и отключение вертикальных свайпов при поддержке метода.
+- Сайт и Mini App используют один и тот же Worker URL; отдельная серверная ветка для Telegram не создаётся.
+- По официальной документации Telegram Main Mini App должен быть настроен через @BotFather; URL главного Mini App задаётся там, а Telegram открывает его внутри WebView.
+
+### Deployment
+- Commit с UI: `a5bcae80db3d78eb549cdda60a01da8259e23426`.
+- GitHub Actions syntax run `34623955616` запущен.
+- Cloudflare deploy run `34623955599` запущен для того же commit.
+
+### Verification boundary
+- CI и Cloudflare deployment должны быть проверены после завершения run.
+- Фактический запуск внутри Telegram-клиента из GitHub/Cloudflare подключения недоступен; отдельно требуется проверка Main Mini App entry в @BotFather, если WebView всё ещё не открывается.
+
 ## 2026-09-10 — Telegram runtime and navigation stabilization
 
 ### Findings
@@ -24,88 +48,23 @@
 ## 2026-09-08 — Lightning rebuilt from ReactionGame.jsx
 
 ### Changed
-- `games/lightning_v2.js` полностью переписан по поведению из проектного `ReactionGame.jsx`, а не по прежней упрощённой реализации.
+- `games/lightning_v2.js` полностью переписан по поведению из приложенного `ReactionGame.jsx`.
 - Сохранена модель из референса: 5 раундов; старт через `Готов`; случайная пауза 1,5–3,5 секунды; ожидание вспышки; 1 цель в раундах 1–2, 2 цели в 3–4, 3 цели в 5; ловушки с вероятностью 15% начиная с 3-го раунда; измерение реакции в миллисекундах; промежуточный результат; финальный экран.
-- Исправлен игровой UX: цель является отдельной интерактивной областью, промахи по полю считаются ошибками, ранние нажатия до сигнала не дают ложного положительного результата.
-- Визуальная часть переведена в единый digital/neon HUD продукта: cyan/violet/orange, сетка, glow, компактный мобильный HUD и крупная зона игры.
-- Сохранение результата оставлено через существующий `/api/game-sessions` с `game_code=lightning`; в payload передаются средняя реакция, точность, длительность, ошибки и массив реакций.
-
-### Source boundary
-- Поведение взято непосредственно из приложенного `ReactionGame.jsx`; редизайн не должен менять механику игры.
-- `Home.jsx` используется как UI/UX-референс продукта, но его демонстрационные числа не являются данными игрока.
+- Визуальная часть переведена в единый digital/neon HUD продукта.
+- Сохранение результата оставлено через существующий `/api/game-sessions`.
 
 ### Verification
 - Новый commit: `f762aee1e1df6243fdcbb4b3a62c3b722bfd7962`.
-- GitHub Actions для этого commit через подключение пока не вернул workflow run; поэтому CI не объявляется успешным.
-- Production Telegram WebView smoke-test через это подключение недоступен.
+- Production Telegram WebView smoke-test через подключение не выполнялся.
 
 ## 2026-09-08 — Unified neon UI across the application
 
 ### Changed
 - Принят `Home.jsx` как исходный UI/UX-референс: композиция, игровой приоритет, карточки тренировок и иерархия действий.
-- `ReactionGame.jsx` изучен как источник поведения игры «Молния»: 5 раундов, ожидание сигнала, неоновая цель, реакция в миллисекундах, ранние нажатия, итоговые метрики. Это поведение не заменяется редизайном.
-- В `main_app.js` добавлен единый neon HUD-слой для Home, Progress и всех игровых маршрутов: тёмный digital-фон, нейросеточная сетка, cyan/violet/orange glow, тонкие HUD-контуры, единая типографика и безопасная мобильная навигация.
-- Главный экран теперь использует реальный проектный asset `design/image.jpg` как символ героя вместо ранее нарисованного SVG-аватара.
-- Убраны старые декоративные элементы, которые конфликтовали с новым цифровым стилем.
-- Для внутренних экранов добавлена единая кнопка возврата в игровой хаб.
-- Сохранены реальные backend-данные и существующие маршруты игр; визуальный слой не подменяет серверную логику.
-
-### Important
-- `design/image.jpg` является источником изображения героя. На Home он подключён как проектный asset через raw-ресурс репозитория, потому что Worker сейчас не имеет отдельного static-assets binding в `wrangler.toml`.
-- Статические значения из исходного `Home.jsx` (`12450` монет, `12` уровень, `850 XP`, `72/58/81`) не используются как реальные данные игрока.
+- `ReactionGame.jsx` изучен как источник поведения игры «Молния».
+- В `main_app.js` добавлен единый neon HUD-слой для Home, Progress и игровых маршрутов.
+- Ранее Home использовал `design/image.jpg` как проектный asset героя; в текущем проходе это заменено на встроенного SVG-героя без фоновой фотографии.
 
 ### Verification
-- Предыдущий GitHub Actions run `34219321483` для commit `d4a301f9c02d0729f6e8d3d04eaf43b67d9c7716` завершился `success` на шаге JavaScript syntax.
-- После текущих изменений требуется новый CI run для commit `09565551f1b23f5b03b88eb02809700784c0ba66`.
+- Предыдущий GitHub Actions run `34219321483` завершился `success` на шаге JavaScript syntax.
 - Production Telegram WebView визуально через это подключение не проверялся.
-
-## 2026-09-08 — Home UI: full neon/neural rebuild
-
-### Changed
-- Полностью заменён предыдущий визуальный слой `home_page.js`; старый плоский интерфейс больше не используется на `/`.
-- Home переработан как цифровой HUD: нейросеточная сетка, scan-line, glow, тонкие контуры, моноширинные системные подписи, cyan/violet/orange neon-акценты и компактная иерархия.
-- Убраны декоративные элементы, которые не поддерживаются текущим backend: streak, фальшивое начисление монет, локальное изменение XP/уровня, локальная кастомизация персонажа.
-- Все значения игрока на Home теперь загружаются из существующего `/api/progress`: имя, уровень, опыт, монеты, статистика тренировок и квест.
-- Кнопка `ИГРАТЬ` ведёт в существующую рабочую тренировку Lightning; карточки ведут только на существующие игровые маршруты.
-- Метрики Home используют реальные `best_accuracy_percent` из `/api/progress`; отсутствующие результаты показываются как `—`, без подстановки выдуманных чисел.
-- Нижняя навигация сокращена до реально используемых разделов: Главная, Игры, Прогресс, Ещё.
-- Сохранён Telegram WebApp bootstrap из `main_app.js`; Home отправляет `x-telegram-init-data` при загрузке прогресса.
-
-### Product/UI boundary
-- `Home.jsx` остаётся исходным референсом композиции и игрового потока, но визуальный слой намеренно переведён в более цифровой/neon HUD.
-- Серверные игровые награды, XP и монеты не эмулируются на клиенте.
-- Персонаж является визуальным представлением; серверная система косметики отдельно не добавлялась.
-
-### Verification boundary
-- Коммит: `d4a301f9c02d0729f6e8d3d04eaf43b67d9c7716`.
-- Код интегрирован в `main` репозитория `knyavik-stack/neurogeroy`.
-- Production/Telegram WebView визуальный smoke-test этим подключением не выполнялся.
-
-## 2026-09-08 — Canonical entrypoint and Telegram recovery
-
-### Fixed
-- `main_app.js` owns `/`, all four enabled game routes, `/progress`, `/api/progress` and delegates persistence POST to `worker_entry.js`.
-- `games/lightning_v2.js` is a 5-round session with average reaction, false-start count, completion and per-round timing persistence.
-- Added asynchronous Telegram SDK bootstrap.
-- `worker.js` remains a compatibility entrypoint for the canonical app.
-- `wrangler.toml` points at `root_entry.js`, which wraps the canonical app.
-- All result writes continue through `/api/game-sessions` and the normalized Supabase RPC.
-
-### Verification
-- Historical local syntax checks passed for the stabilization pass.
-- GitHub Actions validation is required after subsequent commits.
-- Real Telegram WebView and Cloudflare production deployment are not exposed by this connection.
-
-## 2026-09-07 — Audit V2/V3 corrective pass
-
-### Fixed
-- Normalized `record_game_session` to one 15-parameter contract and removed legacy RPC overloads from the live database.
-- Verified RPC permissions: `public`, `anon`, and `authenticated` cannot execute `record_game_session`; only `service_role` can.
-- Added reproducible repository migrations for RPC cleanup and Lightning route alignment.
-- Added centralized result-save error handling.
-- Extended Memory Grid v2 to an 8-round session with aggregate metrics and input timings.
-
-### Verification
-- Transactional Supabase persistence smoke test passed and was rolled back, leaving no test player/session rows.
-- Historical migration drift remains documented and was not rewritten retroactively.
-- Server-side anti-cheat/recalculation remains unresolved.
