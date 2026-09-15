@@ -1,101 +1,73 @@
 # Development Log
 
-## 2026-09-15 — Telegram Mini App navigation fix
+## 2026-09-15 — Telegram navigation hardened: all secondary screens stay inside the Mini App
+
+### Problem
+- Previous fix embedded game routes in a same-origin iframe, but Home still opened `/progress` with a top-level `location.assign()`.
+- Therefore navigation was not consistently handled by one mechanism inside the Telegram WebView.
+
+### Fixed
+- Home now uses the same in-app embedded frame for **all secondary screens**: `/games/lightning`, `/games/memory-grid`, `/games/switcher`, `/games/focus-ribbon` and `/progress`.
+- The Telegram native `BackButton` is shown while a secondary screen is open and closes that screen without leaving the Main Mini App.
+- The frame has explicit `allow="camera; microphone; geolocation"` and `referrerpolicy="same-origin"` attributes.
+- `/games` inside the embedded frame is normalized to `/games/lightning` for backward compatibility.
+- Progress actions returning to training use `/#training`, so the parent Home returns directly to the training section.
+- The Home overlay remains same-origin and uses the existing game pages without duplicating their code.
+
+### Commits
+- `d5184dd8caac2374ec8c861fcbbb8d8e1e0823c0` — keep progress and games inside Mini App.
+- `1a6dc4e21e860cc9053b28ad9e653f2d71a971de` — fix progress navigation back to training.
+
+### Verification boundary
+- Changes were made only in `knyavik-stack/neurogeroy`.
+- GitHub Actions syntax check and Cloudflare deployment must complete for these two commits before calling the production deployment confirmed.
+- A real Telegram client/device cannot be operated from this connection, so live interaction inside Telegram is not claimed as tested.
+
+## 2026-09-15 — Previous Telegram game navigation workaround (superseded)
 
 ### Root cause found
 - Home used `location.assign('/games/...')` for every game launch. Для обычного браузера это работало, но в Telegram WebView полный переход внутри Main Mini App был ненадёжным: пользователь оставался на Home и игровые экраны не открывались.
 - Это было ошибкой навигационного слоя, а не игровой логики.
 
-### Fixed
-- Home теперь открывает игровые маршруты через same-origin `fetch()` внутри текущего Telegram WebView.
-- Полученный HTML устанавливается в текущий документ без повторного открытия WebView.
-- URL меняется через `history.pushState`, а `popstate` поддерживает возврат по истории.
-- Поддержаны маршруты `/games/lightning`, `/games/memory-grid`, `/games/switcher`, `/games/focus-ribbon` и `/progress`.
-- Старый `/games` внутри клиентской навигации направляется на `/games/lightning`.
-- Добавлен явный loading state при открытии экрана и сообщение об ошибке при неуспешном запросе.
-- Нижняя вкладка `ИГРЫ` остаётся внутри Home и прокручивает к четырём тренировкам.
+### Fixed at that stage
+- Home opened game routes through a same-origin embedded frame inside the current Telegram WebView.
+- Supported `/games/lightning`, `/games/memory-grid`, `/games/switcher`, `/games/focus-ribbon` and `/progress` as routes served by the same Worker.
+- The separate `/games` screen remained removed and redirected to Home.
 
-### Verification boundary
-- Изменение выполнено только в `knyavik-stack/neurogeroy`.
-- Коммит навигации: `0d370d02ee15ccf8da63dd7526be40671f2f95cc`.
-- После push требуется пройти syntax check и Cloudflare deploy.
-- Реальный Telegram-клиент из текущего подключения физически не эмулируется, поэтому live-тест внутри Telegram нельзя выдавать за выполненный.
+### Superseded by
+- The 2026-09-15 hardening above, which moved `/progress` into the same embedded navigation layer as games.
 
 ## 2026-09-15 — End-to-end game result persistence hardening
 
 ### Product flow
 - Основной пользовательский контур: Главная → игра → результат → сохранение результата → Прогресс → статистика → возврат к тренировкам.
 - При ошибке сохранения результата больше нет принудительной перезагрузки страницы, которая могла повторно запускать экран результата и создавать риск повторной записи.
-- Общая оболочка теперь сохраняет исходный POST `/api/game-sessions` и позволяет повторить именно запрос сохранения кнопкой `Повторить сохранение`.
+- Общая оболочка сохраняет исходный POST `/api/game-sessions` и позволяет повторить именно запрос сохранения кнопкой `Повторить сохранение`.
 - После успешного повторения ошибка убирается без перезагрузки игры.
 
 ### Verification boundary
 - Изменение выполнено только в `knyavik-stack/neurogeroy`.
 - Последний подтверждённый Cloudflare deploy до этого изменения: GitHub Actions run `34943351858`, deploy job `104296910569` — success.
-- Для текущего изменения после push требуется дождаться нового syntax/deploy workflow.
-- Реальный runtime внутри Telegram-клиента из текущего подключения физически не эмулируется; это не считается выполненным тестом.
+- Реальный runtime внутри Telegram-клиента из текущего подключения физически не эмулируется.
 
 ## 2026-09-15 — Single training hub and functional game stabilization
 
 ### Product decision
 - Экран `/games` признан дублирующим: Home уже содержит полный набор из четырёх тренировок.
 - `/games` больше не является отдельным экраном и теперь делает HTTP redirect на `/`, сохраняя совместимость со старыми ссылками.
-- Игровой выход и Telegram `BackButton` теперь возвращают сразу на Home, где пользователь видит весь набор тренировок.
-- Убран лишний промежуточный шаг между завершением игры и выбором следующей тренировки.
+- Игровой выход и Telegram `BackButton` возвращают сразу на Home.
 
 ### Fixed
 - `games/memory_grid_v2.js`: ошибка в раунде больше не вызывает краткий ложный экран результата. Теперь показывается явное состояние `Ошибка. Следующий раунд…`, затем начинается следующий раунд.
-- `games_page.js` удалён из репозитория: отдельный UI экрана игр больше не существует даже как неиспользуемый production-артефакт.
-- `home_page_neon.js` удалён из репозитория: старый альтернативный Home с большой hero-иллюстрацией больше не хранится как legacy-код.
-- Навигация игровых экранов переведена с `/games` на `/`.
-- Навигация Progress → игры теперь возвращает на Home.
-
-### Navigation cleanup
-- Кнопка `ВСЕ ИГРЫ →` на Home удалена из DOM: отдельного экрана `/games` больше нет.
-- Нижняя вкладка `ИГРЫ` теперь прокручивает Home непосредственно к секции четырёх тренировок вместо перехода через редирект.
-- Сохранена совместимость со старыми URL `/games` через редирект на Home.
-
-### Previous functional fixes retained
-- `games/switcher_v2.js`: генерация стимулов исправлена так, чтобы реально присутствовали и подходящие, и неподходящие варианты.
-- `root_entry.js`: для «Молнии» есть визуальная вспышка в момент появления цели.
-- `root_entry.js`: ложные старты «Молнии» перехватываются и передаются в `/api/game-sessions` как `false_starts`.
-- Telegram `BackButton` используется на игровых маршрутах; в веб-версии доступна собственная кнопка выхода.
-
-### Verification boundary
-- Изменения находятся только в `knyavik-stack/neurogeroy`.
-- GitHub Actions выполняет syntax check и Cloudflare deployment после JavaScript push.
-- Реальный запуск внутри Telegram-клиента из текущего подключения физически не эмулируется.
-
-## 2026-09-15 — Functional game pass
-
-### Fixed
-- `games/switcher_v2.js`: исправлена генерация стимулов. Ранее функция `make()` фактически могла выдавать только совпадающие с правилом фигуры; теперь отдельно генерируются `matching` и `nonMatching` варианты, поэтому механика «нажми / не нажимай» действительно работает.
-- `root_entry.js`: для «Молнии» добавлена визуальная вспышка в момент появления цели.
-- `root_entry.js`: для «Молнии» добавлен учёт ложных стартов на уровне оболочки и передача `false_starts` в сохранение результата.
-
-### Verification
-- JavaScript syntax workflow `34940543913` — success.
-- Cloudflare deploy workflow `34940543986` — success.
-
-## 2026-09-15 — Unified game shells and Telegram navigation
-
-### Changed
-- Игровые маршруты `/games/lightning`, `/games/memory-grid`, `/games/switcher`, `/games/focus-ribbon` получили единый dark sci-fi/neon shell поверх существующей игровой логики.
-- Для Telegram Mini App на игровых маршрутах подключён нативный `Telegram.WebApp.BackButton`.
-- Визуальная оболочка памяти, переключателя и фокус-ленты приведена к общей системе карточек, границ, glow и CTA.
-- Lightning использует отдельный игровой HUD; общий shell добавляет навигационные и визуальные элементы.
+- `games_page.js` удалён.
+- `home_page_neon.js` удалён.
+- `games/switcher_v2.js`: исправлена генерация стимулов так, чтобы реально присутствовали подходящие и неподходящие варианты.
 
 ## 2026-09-15 — Functional cleanup after visual pass
 
 ### Fixed
 - Квест `Сегодня` и `Разминка мозга` в `/api/progress` считают только игровые сессии за текущую календарную дату UTC, а не всю историю игрока.
 - Общий HUD больше не содержит ссылку на `design/image.jpg` и не может вернуть удалённую картинку героя через legacy `.avatar`-правило.
-
-### Commits
-- Home: `9b5268efd4c574506df7c7d0f260f72b9def759b`.
-- Legacy hero override removal: `24afda2eac14db8c8638e7738f2efec3711c54c2`.
-- Progress UI: `78d6ffb857ba35aa1745b494ab3fac0f6c47e2a6`.
-- Daily quest counting: `e15a0f43e1f09d33300d5b12eba6da4a139301b9`.
 
 ## 2026-09-15 — Home compacted and navigation/progress unified
 
@@ -104,12 +76,6 @@
 - Home переведён на компактную игровую композицию: заголовок → `Играть` → квест → четыре тренировки → уровень/XP.
 - Progress переведён на тот же dark sci-fi visual system.
 - Все четыре карточки тренировок ведут в реальные игровые маршруты.
-- Основная кнопка `Играть` ведёт в `/games/lightning`.
-
-### Backend
-- Сохранена загрузка реального профиля через `/api/progress` и Telegram `initData`.
-- Сохранение игровых результатов выполняется через `/api/game-sessions`.
-- `/health` сообщает revision `2026-09-15`.
 
 ## 2026-09-08 — Lightning rebuilt from ReactionGame.jsx
 
