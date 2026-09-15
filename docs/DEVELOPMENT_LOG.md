@@ -1,5 +1,23 @@
 # Development Log
 
+## 2026-09-15 — Unified game shells and Telegram navigation
+
+### Changed
+- Игровые маршруты `/games/lightning`, `/games/memory-grid`, `/games/switcher`, `/games/focus-ribbon` получили единый dark sci-fi/neon shell поверх существующей игровой логики.
+- Для игровых экранов добавлен компактный переход `‹ ИГРЫ`, чтобы выходить из тренировки непосредственно в `/games`, а не терять пользователя на главной.
+- Для Telegram Mini App на игровых маршрутах подключён нативный `Telegram.WebApp.BackButton`: он ведёт в `/games`.
+- Кнопки `К играм` и `В меню` внутри старых игровых оболочек нормализованы на `/games`, без изменения механики самих тренировок.
+- Визуальные оболочки памяти, переключателя и фокус-ленты приведены к той же системе карточек, границ, glow и оранжевых CTA, что Home и Progress.
+- Lightning оставлен без изменения игровой механики и уже использует отдельный более развитый игровой HUD.
+
+### Telegram verification
+- Использован официальный API `Telegram.WebApp.BackButton`; Telegram документирует `show()`, `hide()` и `onClick()` для нативной кнопки возврата. См. https://core.telegram.org/bots/webapps.
+
+### Verification boundary
+- Commit создан в `main` репозитория `knyavik-stack/neurogeroy`.
+- GitHub Actions syntax/deploy запускаются автоматически после push.
+- Реальный запуск игры внутри клиента Telegram из текущего подключения не эмулируется; проверяется после deployment на устройстве.
+
 ## 2026-09-15 — Functional cleanup after visual pass
 
 ### Fixed
