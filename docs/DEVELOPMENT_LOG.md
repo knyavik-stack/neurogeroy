@@ -1,5 +1,26 @@
 # Development Log
 
+## 2026-09-15 — Telegram Mini App navigation fix
+
+### Root cause found
+- Home used `location.assign('/games/...')` for every game launch. Для обычного браузера это работало, но в Telegram WebView полный переход внутри Main Mini App был ненадёжным: пользователь оставался на Home и игровые экраны не открывались.
+- Это было ошибкой навигационного слоя, а не игровой логики.
+
+### Fixed
+- Home теперь открывает игровые маршруты через same-origin `fetch()` внутри текущего Telegram WebView.
+- Полученный HTML устанавливается в текущий документ без повторного открытия WebView.
+- URL меняется через `history.pushState`, а `popstate` поддерживает возврат по истории.
+- Поддержаны маршруты `/games/lightning`, `/games/memory-grid`, `/games/switcher`, `/games/focus-ribbon` и `/progress`.
+- Старый `/games` внутри клиентской навигации направляется на `/games/lightning`.
+- Добавлен явный loading state при открытии экрана и сообщение об ошибке при неуспешном запросе.
+- Нижняя вкладка `ИГРЫ` остаётся внутри Home и прокручивает к четырём тренировкам.
+
+### Verification boundary
+- Изменение выполнено только в `knyavik-stack/neurogeroy`.
+- Коммит навигации: `0d370d02ee15ccf8da63dd7526be40671f2f95cc`.
+- После push требуется пройти syntax check и Cloudflare deploy.
+- Реальный Telegram-клиент из текущего подключения физически не эмулируется, поэтому live-тест внутри Telegram нельзя выдавать за выполненный.
+
 ## 2026-09-15 — End-to-end game result persistence hardening
 
 ### Product flow
