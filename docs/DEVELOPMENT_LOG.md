@@ -1,5 +1,24 @@
 # Development Log
 
+## 2026-09-15 — Functional cleanup after visual pass
+
+### Fixed
+- Квест `Сегодня` и `Разминка мозга` в `/api/progress` теперь считают только игровые сессии за текущую календарную дату UTC, а не всю историю игрока.
+- Общий HUD больше не содержит ссылку на `design/image.jpg` и не может вернуть удалённую картинку героя через legacy `.avatar`-правило.
+
+### Commits
+- Home: `9b5268efd4c574506df7c7d0f260f72b9def759b`.
+- Legacy hero override removal: `24afda2eac14db8c8638e7738f2efec3711c54c2`.
+- Progress UI: `78d6ffb857ba35aa1745b494ab3fac0f6c47e2a6`.
+- Daily quest counting: `e15a0f43e1f09d33300d5b12eba6da4a139301b9`.
+
+### Verification
+- Syntax check для Home cleanup: GitHub Actions run `34939253506` — success.
+- Syntax check для legacy override cleanup: run `34939286666` — success.
+- Syntax check для Progress UI: run `34939326569` — success.
+- Cloudflare deploy для Progress UI: run `34939326558` — success.
+- Cloudflare deploy для legacy override cleanup: run `34939286777` — success.
+
 ## 2026-09-15 — Home compacted and navigation/progress unified
 
 ### Changed
@@ -40,7 +59,7 @@
 
 ### Deployment
 - Commit с UI: `a5bcae80db3d78eb549cdda60a01da8259e23426`.
-- GitHub Actions syntax run `34623955616` запущен.
+- GitHub Actions syntax run `34623955516` запущен.
 - Cloudflare deploy run `34623955599` запущен для того же commit.
 
 ### Verification boundary
