@@ -1,5 +1,35 @@
 # Development Log
 
+## 2026-09-18 — Telegram game integration and persistence hardening
+
+### Problem
+- В Telegram Mini App «Молния» запускалась, но результат мог не сохраняться.
+- Остальные три тренировки имели отдельную визуальную систему и отличались от принятого dark sci-fi/neon интерфейса продукта.
+- Навигация вторичных экранов через переходы верхнего уровня Telegram WebView оставалась ненадёжной.
+
+### Fixed
+- Все четыре игровые страницы и «Прогресс» открываются внутри текущего Mini App через встроенный same-origin экран.
+- В родительский экран добавлена передача Telegram initData во встроенную страницу через postMessage.
+- Игры используют переданный initData как резервный источник авторизации при сохранении результата.
+- Сохранение результатов теперь работает для игры, даже если Telegram WebApp API внутри вложенного документа не предоставляет initData.
+- Для «Память-сетка», «Переключатель» и «Фокус-лента» усилена общая визуальная оболочка: тёмный фон, neon-акценты, единые карточки и CTA.
+- Навигация «Прогресс» также удерживается внутри Mini App.
+
+### Commits
+- `740979bf8b08caa09ef8179729caf6e1b16844e1` — Telegram initData bridge.
+- `4f76ef0c964edeba8cd8461c5907cc5d93b97ae5` — Lightning save fallback.
+- `e0ba287609cfac64bf0e5ecb04b01e108fe23e18` — Memory save fallback.
+- `5a8e96fd536278d4f0feb92e51ad72f4f9bf13db` — Switcher save fallback.
+- `063039f0f9b9d87992694584de05956463deb053` — Focus save fallback.
+- `476ffbd8bb973656149eb7ecd7c76908a16e5acf` — parent iframe auth handoff.
+- `977a0f4a87b640142a68d3787f862af8fd10a010` — unified secondary-game visual shell.
+
+### Verification boundary
+- Изменения выполнены только в `knyavik-stack/neurogeroy`.
+- Исходный код проверен через GitHub после каждой записи.
+- Live-взаимодействие с физическим Telegram-клиентом из текущего подключения недоступно, поэтому оно не выдаётся за выполненный тест.
+- После последнего push GitHub Actions должен выполнить syntax check и Cloudflare deploy.
+
 ## 2026-09-15 — Telegram navigation hardened: all secondary screens stay inside the Mini App
 
 ### Problem
